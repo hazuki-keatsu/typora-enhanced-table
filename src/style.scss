@@ -1,4 +1,8 @@
 #write table[data-enhanced-table] {
-  [contenteditable=true]:focus { outline: 1px solid var(--select-text-bg-color, #508cf0); }
-  [data-enhanced-table-selected] { background: rgba(80, 140, 240, .16); }
+	[contenteditable="true"]:focus {
+		outline: 1px solid var(--select-text-bg-color, #508cf0);
+	}
+	[data-enhanced-table-selected] {
+		background: rgba(80, 140, 240, 0.16);
+	}
 }

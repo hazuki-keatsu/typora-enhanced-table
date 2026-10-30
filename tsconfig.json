@@ -1,22 +1,16 @@
 {
-  "compilerOptions": {
-    "types": [
-      "jquery",
-      "node"
-    ],
-    "target": "ESNext",
-    "baseUrl": ".",
-    "module": "ESNext",
-    "allowJs": true,
-    "resolveJsonModule": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "importHelpers": true,
-    "isolatedModules": true,
-    "strictNullChecks": true,
-    "skipLibCheck": true
-  },
-  "include": [
-    "src/**/*.ts"
-  ]
+	"compilerOptions": {
+		"types": ["jquery", "node"],
+		"target": "ESNext",
+		"module": "ESNext",
+		"allowJs": true,
+		"resolveJsonModule": true,
+		"noImplicitAny": true,
+		"moduleResolution": "bundler",
+		"importHelpers": true,
+		"isolatedModules": true,
+		"strictNullChecks": true,
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts"]
 }

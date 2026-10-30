@@ -1,13 +1,25 @@
-import { build } from 'esbuild'
-import fs from 'node:fs/promises'
-await fs.mkdir('.test-dist', { recursive: true })
+import { build } from "esbuild";
+import fs from "node:fs/promises";
+await fs.mkdir(".test-dist", { recursive: true });
 await build({
-  entryPoints: ['src/main.ts'], bundle: true, outfile: '.test-dist/plugin.js', format: 'iife', globalName: 'TablePlugin',
-  plugins: [{ name: 'browser-host', setup(build) {
-    build.onResolve({ filter: /^(@typora-community-plugin\/core|typora)$/ }, args => ({ path: args.path, namespace: 'host' }))
-    build.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path === 'typora'
-      ? 'export const editor = window.hostEditor; export const File = window.hostFile'
-      : `export const HtmlPostProcessor = {from: value => value};
+	entryPoints: ["src/main.ts"],
+	bundle: true,
+	outfile: ".test-dist/plugin.js",
+	format: "iife",
+	globalName: "TablePlugin",
+	plugins: [
+		{
+			name: "browser-host",
+			setup(build) {
+				build.onResolve(
+					{ filter: /^(@typora-community-plugin\/core|typora)$/ },
+					(args) => ({ path: args.path, namespace: "host" }),
+				);
+				build.onLoad({ filter: /.*/, namespace: "host" }, (args) => ({
+					contents:
+						args.path === "typora"
+							? "export const editor = window.hostEditor; export const File = window.hostFile"
+							: `export const HtmlPostProcessor = {from: value => value};
          export const HtmlExportProcessor = {from: value => value};
          export class Plugin {
            commands = []; processors = []; disposables = [];
@@ -27,11 +39,20 @@ await build({
              this.register(() => target.removeEventListener(name, handler, options));
            }
            unload() { this.onunload(); this.disposables.forEach(dispose => dispose()) }
-         }`, loader: 'js' }))
-    build.onLoad({ filter: /\.scss$/ }, () => ({ contents: '', loader: 'js' }))
-  } }],
-})
-await fs.writeFile('.test-dist/index.html', `<!doctype html><meta charset="utf-8">
+         }`,
+					loader: "js",
+				}));
+				build.onLoad({ filter: /\.scss$/ }, () => ({
+					contents: "",
+					loader: "js",
+				}));
+			},
+		},
+	],
+});
+await fs.writeFile(
+	".test-dist/index.html",
+	`<!doctype html><meta charset="utf-8">
 <style>td {border:1px solid #888; min-width:80px; padding:16px} [data-enhanced-table-selected] {background:#def}</style>
 <div id="write"><div cid="n1" mdtype="html_block" class="md-htmlblock"><div class="md-htmlblock-container" contenteditable="false"><table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table></div></div><p id="outside" contenteditable="true">Outside</p></div>
 <script>
@@ -54,5 +75,8 @@ window.plugin = new TablePlugin.default(); plugin.onload();
 window.decorate = () => plugin.processors.forEach(p=>document.querySelectorAll(p.selector).forEach(el=>p.process(el,{containerEl:hostEditor.writingArea})));
 decorate(); window.originalTable = document.querySelector('table');
 window.command = id=>plugin.commands.find(c=>c.id===id).callback();
-</script>`)
-console.log('Browser fixture: .test-dist/index.html (real plugin, simulated Typora boundary)')
+</script>`,
+);
+console.log(
+	"Browser fixture: .test-dist/index.html (real plugin, simulated Typora boundary)",
+);
