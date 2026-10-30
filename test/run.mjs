@@ -12,6 +12,6 @@ window.document.body.innerHTML = '<pre id="result"></pre>'
 const script = html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/^import .*$/m, '')
 new Function('mergeCells', 'splitCell', 'tableGrid', 'window', 'document', script)(mergeCells, splitCell, tableGrid, window, window.document)
 assert.equal(window.testResult.error, undefined)
-assert.equal(window.testResult.passed, 13)
+assert.equal(window.testResult.passed, 16)
 console.log(window.document.querySelector('#result').textContent)
 await window.happyDOM.close()

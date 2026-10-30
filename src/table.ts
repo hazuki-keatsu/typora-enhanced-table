@@ -47,11 +47,13 @@ export function mergeCells(table: HTMLTableElement, selected: HTMLTableCellEleme
   const first = chosen.find(r => r.top === top && r.left === left)!
   first.cell.rowSpan = bottom - top + 1
   first.cell.colSpan = right - left + 1
+  let contentRow = top
   chosen.filter(r => r !== first).forEach(r => {
-    if (r.cell.innerHTML.trim()) {
+    if (r.top !== contentRow) {
       first.cell.appendChild(document.createElement('br'))
-      while (r.cell.firstChild) first.cell.appendChild(r.cell.firstChild)
+      contentRow = r.top
     }
+    while (r.cell.firstChild) first.cell.appendChild(r.cell.firstChild)
     r.cell.remove()
   })
   return first.cell

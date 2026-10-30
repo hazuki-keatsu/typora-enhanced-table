@@ -11,3 +11,12 @@
 - [x] Smallest safe decomposition：耦合实现由一名代理完成，主线程独立验收。
 - [x] DOM 回归、类型检查、真实 Safari 输入和构建。
 - [x] 完成代码与验证记录；提交、推送结果见交付回复。
+
+## 原生菜单与合并布局
+
+- [x] Blocking first steps：确认 core keyup 分发及合并函数全部调用者。
+- [x] Independent workstreams：代理只提供布局补丁，主线程负责菜单/快捷键和集成。
+- [x] Shared mutable state：无共享写入，保持现有单编辑会话。
+- [x] Smallest safe decomposition：移除菜单及直接快捷键处理，复用现有注册与 CellRect。
+- [x] 新测试先失败，最小补丁后行为、集成和类型检查通过。
+- [x] Safari 与打包验收；提交结果见交付回复。

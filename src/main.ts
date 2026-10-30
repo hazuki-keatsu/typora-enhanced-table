@@ -38,19 +38,16 @@ function undoAPI(): NativeUndo {
 export default class EnhancedTable extends Plugin {
   private session: Session | undefined
   private tables = new Set<HTMLTableElement>()
-  private menu: HTMLElement | undefined
 
   onload() {
-    const modifier = /Mac/.test(navigator.platform) ? 'meta' : 'ctrl'
-    this.registerCommand({ id: 'merge', title: '合并单元格', scope: 'editor', hotkey: `${modifier}+shift+m`, callback: () => this.change('merge') })
-    this.registerCommand({ id: 'split', title: '拆分单元格', scope: 'editor', hotkey: `${modifier}+shift+u`, callback: () => this.change('split') })
+    this.registerCommand({ id: 'merge', title: '合并单元格', scope: 'editor', hotkey: 'ctrl+shift+m', callback: () => this.change('merge') })
+    this.registerCommand({ id: 'split', title: '拆分单元格', scope: 'editor', hotkey: 'ctrl+shift+u', callback: () => this.change('split') })
     this.registerMarkdownPostProcessor(HtmlPostProcessor.from({
       selector: '.md-htmlblock-container > table',
       process: (el, context) => { if (context.containerEl === editor.writingArea && el instanceof HTMLTableElement) this.enable(el) },
     }))
     this.register(this.app.features.exporter.register(HtmlExportProcessor.from({ process: ({ doc }) => {
       doc.querySelectorAll<HTMLTableElement>(`table[${marker}]`).forEach(table => { table.outerHTML = clean(table) })
-      doc.querySelectorAll('.enhanced-table-context-menu').forEach(menu => menu.remove())
     } })))
     editor.writingArea?.querySelectorAll<HTMLTableElement>('.md-htmlblock-container > table').forEach(table => this.enable(table))
     // Native undo can replace HTML without emitting the core's edit notification.
@@ -65,17 +62,14 @@ export default class EnhancedTable extends Plugin {
     this.register(() => observer.disconnect())
     this.registerDomEvent(document, 'mousedown', (event: MouseEvent) => {
       const table = this.tableAt(event.target)
-      if (!table) {
-        if (!(event.target instanceof Node) || !this.menu?.contains(event.target)) { this.menu?.remove(); this.menu = undefined }
-        return
-      }
+      if (!table || event.button !== 0) return
       if (!writable()) { this.disable(table); return }
       const cell = event.target instanceof HTMLElement ? event.target.closest('td, th') : null
       if (!(cell instanceof HTMLTableCellElement)) return
       if (!this.activate(table)) return
       event.stopImmediatePropagation()
       if (event.shiftKey) event.preventDefault()
-      if (event.button === 0 || !this.session?.selected.includes(cell)) this.select(cell, event.shiftKey)
+      this.select(cell, event.shiftKey)
     }, true)
     this.registerDomEvent(document, 'click', (event: MouseEvent) => {
       if (!this.tableAt(event.target)) return
@@ -137,13 +131,13 @@ export default class EnhancedTable extends Plugin {
           })
           return
         }
-        if (event.shiftKey && ['m', 'u'].includes(key)) {
+        // The core dispatches shortcuts on keyup; suppress native keydown actions.
+        if (event.ctrlKey && !event.metaKey && event.shiftKey && ['m', 'u'].includes(key)) {
           event.preventDefault()
-          this.change(key === 'm' ? 'merge' : 'split')
         }
       }
       event.stopImmediatePropagation()
-      if (event.key === 'Escape') { this.clearSelection(); this.menu?.remove(); this.menu = undefined }
+      if (event.key === 'Escape') this.clearSelection()
       if (event.key === 'Tab') {
         const cells = Array.from(this.session?.table.querySelectorAll<HTMLTableCellElement>('td, th') ?? [])
         const current = event.target instanceof HTMLElement ? event.target.closest('td, th') : null
@@ -152,7 +146,6 @@ export default class EnhancedTable extends Plugin {
         if (next) { event.preventDefault(); next.focus(); this.select(next, false) }
       }
     }, true)
-    this.registerDomEvent(document, 'keyup', (event: KeyboardEvent) => { if (this.tableAt(event.target)) event.stopImmediatePropagation() }, true)
     this.registerDomEvent(document, 'paste', (event: ClipboardEvent) => {
       if (!this.tableAt(event.target)) return
       event.preventDefault()
@@ -160,19 +153,11 @@ export default class EnhancedTable extends Plugin {
       if (writable()) document.execCommand('insertText', false, event.clipboardData?.getData('text/plain') ?? '')
     }, true)
     this.registerDomEvent(document, 'drop', (event: DragEvent) => { if (this.tableAt(event.target)) { event.preventDefault(); event.stopImmediatePropagation() } }, true)
-    this.registerDomEvent(document, 'contextmenu', (event: MouseEvent) => {
-      const table = this.tableAt(event.target)
-      if (!table || !this.activate(table)) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      this.showMenu(event)
-    }, true)
   }
 
   onunload() {
     if (this.session) this.session.composing = false
     this.attempt(() => this.commit())
-    this.menu?.remove()
     this.tables.forEach(table => this.disable(table))
     this.tables.clear()
     this.session = undefined
@@ -281,22 +266,4 @@ export default class EnhancedTable extends Plugin {
   }
 
   private attempt(action: () => void) { try { action() } catch (error) { window.alert(String(error)) } }
-
-  private showMenu(event: MouseEvent) {
-    this.menu?.remove()
-    const menu = document.createElement('div')
-    menu.className = 'enhanced-table-context-menu'
-    menu.setAttribute('contenteditable', 'false')
-    menu.style.left = `${event.clientX}px`
-    menu.style.top = `${event.clientY}px`
-    for (const [label, operation] of [['合并单元格', 'merge'], ['拆分单元格', 'split']] as const) {
-      const button = document.createElement('button')
-      button.textContent = label
-      button.onmousedown = event => event.preventDefault()
-      button.onclick = () => { this.change(operation); menu.remove(); this.menu = undefined }
-      menu.append(button)
-    }
-    document.body.append(menu)
-    this.menu = menu
-  }
 }

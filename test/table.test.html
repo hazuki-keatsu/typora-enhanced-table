@@ -12,6 +12,7 @@ try {
   const t = table('<tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody>')
   const merged = mergeCells(t, Array.from(t.querySelectorAll('td')))
   assert(merged.rowSpan === 2 && merged.colSpan === 2, 'rectangular merge uses both spans')
+  assert(merged.innerHTML === 'AB<br>CD', 'horizontal content stays on its row')
   assert(merged.textContent === 'ABCD', 'merge preserves all content in document order')
   assert(t.rows[1].cells.length === 0, 'covered cells removed')
   splitCell(t, merged)
@@ -31,6 +32,10 @@ try {
   assert(tableGrid(zero)[0].bottom === 1, 'rowspan zero extends to group end')
   splitCell(zero, zero.rows[0].cells[0])
   assert(zero.rows[1].cells.length === 2, 'rowspan zero splits')
+  const horizontal = table('<tbody><tr><td><strong>A</strong><br>B</td><td><em>C</em></td><td></td></tr></tbody>')
+  assert(mergeCells(horizontal, Array.from(horizontal.querySelectorAll('td'))).innerHTML === '<strong>A</strong><br>B<em>C</em>', 'horizontal merge keeps existing markup and adds no newline')
+  const vertical = table('<tbody><tr><td>A</td></tr><tr><td></td></tr><tr><td>C</td></tr></tbody>')
+  assert(mergeCells(vertical, Array.from(vertical.querySelectorAll('td'))).innerHTML === 'A<br><br>C', 'vertical merge preserves empty row boundaries')
   document.querySelector('#result').textContent = `PASS ${passed} assertions`
   window.testResult = { passed }
 } catch (error) {

@@ -14,7 +14,13 @@ const result = await build({
           commands = []; disposables = []; processors = []; exporters = [];
           app = { features: { exporter: { register: processor => { this.exporters.push(processor); return () => {} } } } };
           register(dispose) { this.disposables.push(dispose) }
-          registerCommand(command) { this.commands.push(command) }
+          registerCommand(command) {
+            this.commands.push(command)
+            this.registerDomEvent(globalThis.hostEditor.writingArea, 'keyup', event => {
+              const hotkey = [event.metaKey && 'meta', event.ctrlKey && 'ctrl', event.shiftKey && 'shift', event.altKey && 'alt', event.key.toLowerCase()].filter(Boolean).join('+')
+              if (hotkey === command.hotkey) command.callback()
+            })
+          }
           registerMarkdownPostProcessor(processor) { this.processors.push(processor) }
           registerDomEvent(target, name, callback, options) {
             target.addEventListener(name, callback, options);
@@ -27,6 +33,7 @@ const result = await build({
 })
 const window = new Window()
 const { document } = window
+Object.defineProperty(window.navigator, 'platform', { value: 'MacIntel' })
 const original = '<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>'
 let source = original
 const commands = []
@@ -105,12 +112,20 @@ try {
   mouse(cell)
   mouse(table.rows[1].cells[1], true)
   assert.equal(table.querySelectorAll('[data-enhanced-table-selected]').length, 4)
+  let nativeContext = 0
+  document.querySelector('#write').addEventListener('contextmenu', () => nativeContext++)
+  const context = new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+  cell.dispatchEvent(context)
+  assert.equal(context.defaultPrevented, false, 'native context menu remains available')
+  assert.equal(nativeContext, 1, 'contextmenu reaches the original handler')
+  assert.equal(document.querySelector('.enhanced-table-context-menu'), null)
   const keyCommands = commands.length
-  cell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+  cell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+  assert.equal(commands.length, keyCommands, 'keydown must not invoke merge outside the core registry')
   let coreKeyup = 0
   document.querySelector('#write').addEventListener('keyup', () => coreKeyup++)
-  cell.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'm', metaKey: true, shiftKey: true, bubbles: true }))
-  assert.equal(coreKeyup, 0, 'keyup cannot invoke core merge shortcut a second time')
+  cell.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'm', ctrlKey: true, shiftKey: true, bubbles: true }))
+  assert.equal(coreKeyup, 1, 'keyup reaches the community hotkey registry')
   assert.equal(commands.length, keyCommands + 1)
   assert.equal(table.querySelectorAll('td').length, 1)
   assert.equal(table.rows[0].cells[0].textContent, 'EditedBCD')
@@ -195,5 +210,17 @@ try {
   document.querySelector('.md-htmlblock-container').innerHTML = source
   await new Promise(resolve => setTimeout(resolve, 10))
   assert.equal(document.querySelector('td').contentEditable, 'true', 'render replacement rebinds without a core edit notification')
+  source = original
+  table = setup()
+  mouse(table.rows[0].cells[0])
+  mouse(table.rows[1].cells[1], true)
+  plugin.commands.find(c => c.id === 'merge').hotkey = 'ctrl+shift+k'
+  const beforeRebind = commands.length
+  const firstCell = table.rows[0].cells[0]
+  firstCell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', ctrlKey: true, shiftKey: true, bubbles: true }))
+  firstCell.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'm', ctrlKey: true, shiftKey: true, bubbles: true }))
+  assert.equal(commands.length, beforeRebind, 'old binding cannot merge after customization')
+  firstCell.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'k', ctrlKey: true, shiftKey: true, bubbles: true }))
+  assert.equal(commands.length, beforeRebind + 1, 'customized binding runs through the core registry')
   console.log('PASS inline editor: live DOM, input persistence, native snapshots, merge/split, IME, export, conflict, locks, rollback, undo/redo rerender')
 } finally { plugin?.unload(); await window.happyDOM.close() }

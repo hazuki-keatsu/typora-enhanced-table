@@ -39,3 +39,13 @@
 - Safari WebDriver 通过：真实中文文字输入、光标/表格身份稳定、真实剪切、合并/拆分快捷键、无 UI 属性源码、无 edit 通知重绘后的再次编辑和卸载。截图：`.test-dist/safari-inline.png`。宿主接口使用夹具，不等同 Typora 实机验证。
 - `node build.js --prod`、`node pack.js`、`git diff --check` 通过；`node build.js` 成功安装开发插件并打开 Typora 测试 vault。恢复启动自动生成的 core/env 配置，保留可移植设置。
 - crapper、dryer、mutator 仍无可用工具，未执行；未清理用户已有工作树或文件。用户在基线中删除的 README 未恢复，新增使用说明放在 docs/usage.md。
+
+## 原生菜单与合并文本布局
+
+- 按 ub-mode 先补测试并观察失败：横向合并多出换行，contextmenu 被阻止。审查全部 mergeCells 调用者与社区核心 HotkeyManager，确认核心通过 keyup 分发注册命令。
+- 删除自定义右键菜单及样式，右键 mousedown 不再拦截；保留原生菜单事件。去掉 keydown 直接调用合并/拆分及 keyup 拦截，操作仅经过 registerCommand 注册的核心命令。测试覆盖自定义重绑后旧键不再触发。
+- Safari 实测 Command 组合键缺少字母 keyup，无法触发核心分发；默认统一为 Control+Shift+M 合并、Control+Shift+U 拆分，macOS 使用 Control 而非 Command。只在 keydown 阻止对应原生默认动作，实际操作由核心 keyup 调用。
+- 合并仍使用 CellRect 来源行：同一行内容直接拼接，仅在来源行变化时插入 br；保留已有格式、已有换行和空行。独立代理只提供经内存断言验证的最小补丁，主线程审查后应用，避免共享写入。
+- 原有 13 项表格断言扩展为 16 项；表格行为、编辑集成和 TypeScript 检查通过。原生菜单传播、核心快捷键分发、重绑、水平/垂直布局均纳入回归。
+- Safari 验收通过真实文字输入、剪切、核心 Control 合并/拆分快捷键、横向拼接并保留已有标记、原生 contextmenu 传播、原生重绘后继续编辑、卸载。Typora 宿主仍由夹具模拟。
+- 生产构建与 ZIP 打包通过；开发构建成功安装新版并打开 Typora 测试目录。恢复运行时生成的机器配置；未恢复用户已删除的文档。crapper/dryer/mutator 仍不可用。

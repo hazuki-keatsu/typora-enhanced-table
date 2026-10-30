@@ -2,13 +2,3 @@
   [contenteditable=true]:focus { outline: 1px solid var(--select-text-bg-color, #508cf0); }
   [data-enhanced-table-selected] { background: rgba(80, 140, 240, .16); }
 }
-.enhanced-table-context-menu {
-  position: fixed;
-  z-index: 10001;
-  background: var(--bg-color, white);
-  color: var(--text-color, #333);
-  padding: 8px;
-  border: 1px solid #888;
-  border-radius: 4px;
-  button { display: block; width: 100%; }
-}

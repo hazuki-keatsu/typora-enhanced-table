@@ -12,7 +12,14 @@ await build({
          export class Plugin {
            commands = []; processors = []; disposables = [];
            app = { features: { exporter: {register: processor => { window.exportProcessor = processor; return () => {} }} } };
-           registerCommand(command) { this.commands.push(command) }
+           registerCommand(command) {
+             this.commands.push(command)
+             this.registerDomEvent(globalThis.hostEditor.writingArea, 'keyup', event => {
+               const hotkey = [event.metaKey && 'meta', event.ctrlKey && 'ctrl', event.shiftKey && 'shift', event.altKey && 'alt', event.key.toLowerCase()].filter(Boolean).join('+');
+               (window.hotkeyEvents ??= []).push([hotkey, command.hotkey])
+               if (hotkey === command.hotkey) command.callback()
+             })
+           }
            register(dispose) { this.disposables.push(dispose) }
            registerMarkdownPostProcessor(processor) { this.processors.push(processor) }
            registerDomEvent(target, name, handler, options) {

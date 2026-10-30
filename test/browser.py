@@ -32,7 +32,7 @@ def element(selector):
 def click(selector):
     request(path + '/element/' + element(selector) + '/click', {})
 def shortcut(key, shift=True):
-    modifiers = ['\ue03d'] + (['\ue008'] if shift else [])
+    modifiers = ['\ue009' if shift else '\ue03d'] + (['\ue008'] if shift else [])
     actions = [{'type': 'keyDown', 'value': modifier} for modifier in modifiers] + [
         {'type': 'keyDown', 'value': key}, {'type': 'keyUp', 'value': key},
     ] + [{'type': 'keyUp', 'value': modifier} for modifier in reversed(modifiers)]
@@ -41,6 +41,7 @@ try:
     request(path + '/url', {'url': f'http://127.0.0.1:{server.server_port}/index.html'})
     assert js('return document.querySelector("td").isContentEditable'), 'rendered table must be editable'
     assert js('return !document.querySelector(".enhanced-table-overlay, .enhanced-table-toolbar")'), 'no operation panel'
+    assert js('let received=false; hostEditor.writingArea.addEventListener("contextmenu",()=>received=true,{once:true}); const event=new MouseEvent("contextmenu",{bubbles:true,cancelable:true}); document.querySelector("td").dispatchEvent(event); return received && !event.defaultPrevented && !document.querySelector(".enhanced-table-context-menu")'), 'original context menu remains available'
     click('td')
     request(path + '/element/' + element('td') + '/value', {'text': '文字'})
     assert '文字' in js('return modelText'), 'real browser typing must reach document model'
@@ -52,8 +53,10 @@ try:
     assert js('return nativeEditingEvents.length') == 0, 'cell editing bypasses native Markdown handlers'
     js('document.querySelectorAll("td")[3].dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,shiftKey:true,button:0})); return true')
     assert js('return document.querySelectorAll("[data-enhanced-table-selected]").length') == 4, 'Shift selects rectangle'
+    first_content = js('return document.querySelector("td").innerHTML')
     shortcut('m')
-    assert js('return document.querySelectorAll("td").length') == 1
+    assert js('return document.querySelectorAll("td").length') == 1, js('return {events:window.hotkeyEvents, alerts, commands:plugin.commands.map(c=>c.hotkey)}')
+    assert js('return document.querySelector("td").innerHTML') == first_content + 'B<br>CD', 'same-row content remains inline and existing markup is preserved'
     assert 'rowspan="2"' in js('return modelText') and 'colspan="2"' in js('return modelText')
     assert js('return !/contenteditable|tabindex|data-enhanced-table/.test(modelText)'), 'editor state excluded from source'
     shortcut('u')
