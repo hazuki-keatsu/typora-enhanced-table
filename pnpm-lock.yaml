@@ -42,11 +42,11 @@ importers:
         specifier: 16.18.0
         version: 16.18.0
       '@types/typora':
-        specifier: npm:@typora-community-plugin/typora-types@^1.0.16
-        version: '@typora-community-plugin/typora-types@1.0.16'
+        specifier: npm:@typora-community-plugin/typora-types@^1.0.17
+        version: '@typora-community-plugin/typora-types@1.0.17'
       '@typora-community-plugin/core':
-        specifier: ^2.7.7
-        version: 2.9.6
+        specifier: ^2.10.42
+        version: 2.10.67
       archiver:
         specifier: ^5.3.2
         version: 5.3.2
@@ -59,6 +59,9 @@ importers:
       esbuild-sass-plugin:
         specifier: ^2.12.0
         version: 2.16.1(esbuild@0.19.12)
+      happy-dom:
+        specifier: ^21.0.4
+        version: 21.0.4
       rollup:
         specifier: ^4.1.4
         version: 4.40.2
@@ -1015,11 +1018,20 @@ packages:
   '@types/node@16.18.0':
     resolution: {integrity: sha512-LqYqYzYvnbCaQfLAwRt0zboqnsViwhZm+vjaMSqcfN36vulAg7Pt0T83q4WZO2YOBw3XdyHi8cQ88H22zmULOA==}
 
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
+
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
 
-  '@typora-community-plugin/core@2.9.6':
-    resolution: {integrity: sha512-i062yebc7KAIXIy+s5UTMeMLVSU9Zr1WO+PsmJrKR278ZpTBZAWVlFQMMxY7kLey2UtLUJa6I4AsXrlreeUsrw==}
+  '@types/whatwg-mimetype@3.0.2':
+    resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
+
+  '@typora-community-plugin/core@2.10.67':
+    resolution: {integrity: sha512-q7HwYlxXBPFGPq59LfQmqI+pZPHJti+I4O3MkU7MJNE8oa4KlGQhFNBJQx0QMSVO99dqUgHPLCn9EM4NT9npqQ==}
 
   '@typora-community-plugin/esbuild-plugin-typora@1.0.12':
     resolution: {integrity: sha512-iOEM8e0Y7/83dqVHm2HX9XglL0BD0t4NTbH4PKtea7ohrOxI/frkWb4nHW4iMoxp5mVBdCf5QUpcm3H6DeIfdQ==}
@@ -1027,8 +1039,8 @@ packages:
   '@typora-community-plugin/rollup-plugin-typora@1.1.0':
     resolution: {integrity: sha512-t/bg1VjFNiq1Qv2XERpyD1nROP9nbMuSCosoB9RWa5sPG6GxD6L42A3mUzkQcmkcCbPy9foC4jscWBJO2lo4ow==}
 
-  '@typora-community-plugin/typora-types@1.0.16':
-    resolution: {integrity: sha512-7ICYULlXo9hunI5yZHpUkK+DJ6B17QZLMi52Jbfo6N26uPbtIAiQL40KvVXxtXh8xAMPeLiAE1ZbMbwsy0TR1g==}
+  '@typora-community-plugin/typora-types@1.0.17':
+    resolution: {integrity: sha512-NlrGNixRkiBPGLfC7A/3k/U2ZedufuJywdqwqI2YXz0c2l/jgoskmMjJSfbFcv94v2ntbkm/7/36gnq3OMOgzA==}
 
   acorn@8.14.1:
     resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
@@ -1095,6 +1107,10 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
+
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
@@ -1160,6 +1176,10 @@ packages:
   end-of-stream@1.4.4:
     resolution: {integrity: sha512-+uw1inIHVPQoaVuHzRyXd21icM+cnt4CzD5rW+NC1wjOUSTOs+Te7FOv7AhN7vS9x/oIyhLP5PR1H+phQAHu5Q==}
 
+  entities@7.0.1:
+    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
+    engines: {node: '>=0.12'}
+
   esbuild-sass-plugin@2.16.1:
     resolution: {integrity: sha512-mBB2aEF0xk7yo+Q9pSUh8xYED/1O2wbAM6IauGkDrqy6pl9SbJNakLeLGXiNpNujWIudu8TJTZCv2L5AQYRXtA==}
     peerDependencies:
@@ -1221,6 +1241,10 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  happy-dom@21.0.4:
+    resolution: {integrity: sha512-tFm+GaLBgo6o0awHnvHaNoraVo27qJ+2tZEtZ+cIa08hXbeitrxAJajLI05hsUy/2/YTKcUjQYzHe5mCcraLBw==}
+    engines: {node: '>=20.0.0'}
 
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
@@ -1472,6 +1496,9 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
   unicode-canonical-property-names-ecmascript@2.0.1:
     resolution: {integrity: sha512-dA8WbNeb2a6oQzAQ55YlT5vQAWGV9WXOsi3SskE3bcCdM0P4SDd+24zS/OCacdRq5BkdsRj9q3Pg6YyQoxIGqg==}
     engines: {node: '>=4'}
@@ -1497,8 +1524,24 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
+
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
@@ -2438,9 +2481,19 @@ snapshots:
 
   '@types/node@16.18.0': {}
 
+  '@types/node@26.6.6':
+    dependencies:
+      undici-types: 8.9.0
+
   '@types/resolve@1.20.2': {}
 
-  '@typora-community-plugin/core@2.9.6':
+  '@types/whatwg-mimetype@3.0.2': {}
+
+  '@types/ws@8.18.2':
+    dependencies:
+      '@types/node': 16.18.0
+
+  '@typora-community-plugin/core@2.10.67':
     dependencies:
       '@plylrnsdy/decorate.js': 1.0.4
 
@@ -2448,7 +2501,7 @@ snapshots:
 
   '@typora-community-plugin/rollup-plugin-typora@1.1.0': {}
 
-  '@typora-community-plugin/typora-types@1.0.16': {}
+  '@typora-community-plugin/typora-types@1.0.17': {}
 
   acorn@8.14.1: {}
 
@@ -2549,6 +2602,10 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 16.18.0
+
   buffer@5.7.1:
     dependencies:
       base64-js: 1.5.1
@@ -2602,6 +2659,8 @@ snapshots:
   end-of-stream@1.4.4:
     dependencies:
       once: 1.4.0
+
+  entities@7.0.1: {}
 
   esbuild-sass-plugin@2.16.1(esbuild@0.19.12):
     dependencies:
@@ -2679,6 +2738,19 @@ snapshots:
   globals@11.12.0: {}
 
   graceful-fs@4.2.11: {}
+
+  happy-dom@21.0.4:
+    dependencies:
+      '@types/node': 26.6.6
+      '@types/whatwg-mimetype': 3.0.2
+      '@types/ws': 8.18.2
+      buffer-image-size: 0.6.4
+      entities: 7.0.1
+      whatwg-mimetype: 3.0.0
+      ws: 8.22.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   hasown@2.0.2:
     dependencies:
@@ -2940,6 +3012,8 @@ snapshots:
 
   typescript@5.8.3: {}
 
+  undici-types@8.9.0: {}
+
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
   unicode-match-property-ecmascript@2.0.0:
@@ -2959,7 +3033,11 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
+  whatwg-mimetype@3.0.0: {}
+
   wrappy@1.0.2: {}
+
+  ws@8.22.0: {}
 
   yallist@3.1.1: {}
 

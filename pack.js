@@ -11,6 +11,5 @@ archive.pipe(output)
 
 archive
   .directory('dist', false)
-  .file('src/manifest.json', { name: 'manifest.json' })
 
 archive.finalize()

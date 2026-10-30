@@ -8,3 +8,7 @@ yalc.lock
 # output
 dist/
 plugin.zip
+.test-dist/
+test/vault/.typora/hotkeys.json
+
+.DS_Store

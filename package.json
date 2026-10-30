@@ -1,17 +1,19 @@
 {
   "private": true,
-  "name": "typora-plugin-example",
-  "version": "",
-  "description": "",
+  "name": "typora-enhanced-table",
+  "version": "0.1.0",
+  "description": "Visual HTML table editing and merged cells for Typora",
   "type": "module",
   "main": "",
   "scripts": {
     "build:dev": "node build.js",
-    "build": "rollup -c rollup.config.js",
+    "check": "tsc --noEmit",
+    "test": "node test/run.mjs && node test/editor.mjs",
+    "build": "node build.js --prod",
     "pack": "pnpm run build && node pack.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "hazuki-keatsu",
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.23.2",
@@ -31,6 +33,7 @@
     "esbuild": "^0.19.2",
     "esbuild-plugin-typora": "npm:@typora-community-plugin/esbuild-plugin-typora@^1.0.12",
     "esbuild-sass-plugin": "^2.12.0",
+    "happy-dom": "^21.0.4",
     "rollup": "^4.1.4",
     "rollup-plugin-scss": "^4.0.0",
     "rollup-plugin-typora": "npm:@typora-community-plugin/rollup-plugin-typora@^1.1.0",
