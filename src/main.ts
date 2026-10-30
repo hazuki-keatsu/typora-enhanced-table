@@ -1,7 +1,14 @@
 import "./style.scss";
 import * as Core from "@typora-community-plugin/core";
 import { editor, File } from "typora";
-import { mergeCells, splitCell, tableGrid } from "./table";
+import { attachTableController } from "./controller";
+import {
+	applyTableOperation,
+	mergeCells,
+	splitCell,
+	tableGrid,
+	type TableOperation,
+} from "./table";
 
 const { Plugin, HtmlPostProcessor, HtmlExportProcessor } = Core;
 
@@ -14,6 +21,17 @@ type NativeUndo = {
 	undo?(): void;
 	redo?(): void;
 };
+type MutableEditorNode = EditorNode & {
+	parseFrom(options: {
+		skips: { old_code: boolean; pass_format: boolean };
+	}): [string, EditorNode[]];
+	readFromJson(json: unknown, nodeMap: unknown): void;
+	toHTML(): string;
+};
+type MutableEditor = typeof editor & {
+	store(cid: string): void;
+	nodeMap: unknown;
+};
 type Session = {
 	cid: string;
 	node: EditorNode;
@@ -25,6 +43,7 @@ type Session = {
 };
 const marker = "data-enhanced-table";
 const selectedMarker = "data-enhanced-table-selected";
+const emptyTable = "<table><tbody><tr><td></td></tr></tbody></table>";
 
 function clean(table: HTMLTableElement) {
 	const copy = table.cloneNode(true);
@@ -62,6 +81,7 @@ function undoAPI(): NativeUndo {
 export default class EnhancedTable extends Plugin {
 	private session: Session | undefined;
 	private tables = new Set<HTMLTableElement>();
+	private controllers = new Map<HTMLTableElement, () => void>();
 
 	onload() {
 		this.registerCommand({
@@ -94,6 +114,11 @@ export default class EnhancedTable extends Plugin {
 			this.app.features.exporter.register(
 				HtmlExportProcessor.from({
 					process: ({ doc }) => {
+						doc
+							.querySelectorAll("[data-enhanced-table-controls]")
+							.forEach((el) => {
+								el.remove();
+							});
 						doc
 							.querySelectorAll<HTMLTableElement>(`table[${marker}]`)
 							.forEach((table) => {
@@ -235,6 +260,7 @@ export default class EnhancedTable extends Plugin {
 			document,
 			"keydown",
 			(event: KeyboardEvent) => {
+				if (this.createTable(event)) return;
 				if (!this.tableAt(event.target)) return;
 				if (!writable()) {
 					event.preventDefault();
@@ -346,6 +372,10 @@ export default class EnhancedTable extends Plugin {
 			this.disable(table);
 		});
 		this.tables.clear();
+		this.controllers.forEach((dispose) => {
+			dispose();
+		});
+		this.controllers.clear();
 		this.session = undefined;
 	}
 
@@ -391,11 +421,22 @@ export default class EnhancedTable extends Plugin {
 		table.setAttribute(marker, "");
 		this.prepare(table);
 		this.tables.add(table);
+		this.controllers.set(
+			table,
+			attachTableController(table, {
+				hasSelection: () =>
+					this.session?.table === table && this.session.selected.length === 1,
+				run: (operation) => this.changeStructure(table, operation),
+			}),
+		);
 		for (const previous of this.tables)
-			if (!previous.isConnected) this.tables.delete(previous);
+			if (!previous.isConnected) this.disable(previous);
 	}
 
 	private disable(table: HTMLTableElement) {
+		this.controllers.get(table)?.();
+		this.controllers.delete(table);
+		this.tables.delete(table);
 		table.removeAttribute(marker);
 		table.querySelectorAll("td, th").forEach((cell) => {
 			cell.removeAttribute("contenteditable");
@@ -521,6 +562,123 @@ export default class EnhancedTable extends Plugin {
 			this.prepare(session.table);
 			this.commit();
 		});
+	}
+
+	private changeStructure(table: HTMLTableElement, operation: TableOperation) {
+		this.attempt(() => {
+			const session = this.session;
+			if (
+				!session ||
+				session.table !== table ||
+				session.composing ||
+				session.selected.length !== 1
+			)
+				throw Error("请先选中一个单元格。");
+			if (
+				!writable() ||
+				editor.getNode(session.cid) !== session.node ||
+				session.node.get("text") !== session.lastCommitted
+			)
+				throw Error("文档已改变或被锁定。");
+			const cell = applyTableOperation(table, session.selected[0], operation);
+			this.prepare(table);
+			this.select(cell, false);
+			cell.focus();
+			this.commit();
+		});
+	}
+
+	private createTable(event: KeyboardEvent): boolean {
+		if (
+			event.key !== "Enter" ||
+			event.isComposing ||
+			event.shiftKey ||
+			event.ctrlKey ||
+			event.metaKey ||
+			event.altKey ||
+			!writable() ||
+			!(event.target instanceof HTMLElement)
+		)
+			return false;
+		const paragraph = event.target.closest<HTMLElement>(
+			'p[mdtype="paragraph"][cid]',
+		);
+		if (!paragraph || paragraph.parentElement !== editor.writingArea)
+			return false;
+		const selection = document.getSelection();
+		if (selection?.rangeCount !== 1) return false;
+		const range = selection.getRangeAt(0);
+		const contents = document.createRange();
+		contents.selectNodeContents(paragraph);
+		if (
+			!range.collapsed ||
+			!paragraph.contains(range.endContainer) ||
+			range.compareBoundaryPoints(Range.END_TO_END, contents) !== 0 ||
+			paragraph.textContent?.trim() !== "<table>"
+		)
+			return false;
+		const cid = paragraph.getAttribute("cid");
+		if (!cid) return false;
+		const mutableEditor = editor as MutableEditor;
+		if (
+			typeof mutableEditor.store !== "function" ||
+			!("nodeMap" in mutableEditor)
+		)
+			return false;
+		mutableEditor.store(cid);
+		const node = editor.getNode(cid) as MutableEditorNode | undefined;
+		if (
+			node?.get("text")?.trim() !== "<table>" ||
+			typeof node.parseFrom !== "function" ||
+			typeof node.readFromJson !== "function" ||
+			typeof node.toHTML !== "function"
+		)
+			return false;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		this.attempt(() => {
+			const undo = undoAPI();
+			undo.endSnap?.(true);
+			const before = undo.UndoManager.buildReplaceUndo(node);
+			let createdTable: HTMLTableElement | undefined;
+			try {
+				node.set("text", emptyTable);
+				const [html, nodes] = node.parseFrom({
+					skips: { old_code: false, pass_format: true },
+				});
+				if (nodes.length !== 1 || nodes[0] !== node)
+					throw Error("无法将输入转换为单个 HTML 表格块。");
+				paragraph.outerHTML = html;
+				const block = Array.from(editor.writingArea?.children ?? []).find(
+					(element) => element.getAttribute("cid") === cid,
+				);
+				const table = block?.querySelector(
+					":scope > .md-htmlblock-container > table",
+				);
+				if (!(table instanceof HTMLTableElement))
+					throw Error("Typora 没有生成可编辑的表格预览。");
+				createdTable = table;
+				this.enable(table);
+				if (!table.hasAttribute(marker))
+					throw Error("生成的表格无法进入编辑模式。");
+				const after = undo.UndoManager.buildReplaceUndo(node);
+				undo.register({ undo: [before], redo: [after] });
+				const cell = table.querySelector<HTMLTableCellElement>("td, th");
+				if (cell && this.activate(table)) {
+					this.select(cell, false);
+					cell.focus();
+				}
+			} catch (error) {
+				if (createdTable) this.disable(createdTable);
+				node.readFromJson(before.json, mutableEditor.nodeMap);
+				const current = Array.from(editor.writingArea?.children ?? []).find(
+					(element) => element.getAttribute("cid") === cid,
+				);
+				if (current) current.outerHTML = node.toHTML();
+				throw error;
+			}
+		});
+		return true;
 	}
 
 	private attempt(action: () => void) {

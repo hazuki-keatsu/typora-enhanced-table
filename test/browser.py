@@ -40,7 +40,7 @@ def shortcut(key, shift=True):
 try:
     request(path + '/url', {'url': f'http://127.0.0.1:{server.server_port}/index.html'})
     assert js('return document.querySelector("td").isContentEditable'), 'rendered table must be editable'
-    assert js('return !document.querySelector(".enhanced-table-overlay, .enhanced-table-toolbar")'), 'no operation panel'
+    assert js('return !document.querySelector(".enhanced-table-overlay, .enhanced-table-toolbar")'), 'no detached operation panel'
     assert js('let received=false; hostEditor.writingArea.addEventListener("contextmenu",()=>received=true,{once:true}); const event=new MouseEvent("contextmenu",{bubbles:true,cancelable:true}); document.querySelector("td").dispatchEvent(event); return received && !event.defaultPrevented && !document.querySelector(".enhanced-table-context-menu")'), 'original context menu remains available'
     click('td')
     request(path + '/element/' + element('td') + '/value', {'text': '文字'})
@@ -51,6 +51,12 @@ try:
     shortcut('x', shift=False)
     assert '文字' not in js('return modelText'), 'native browser cut updates the document model'
     assert js('return nativeEditingEvents.length') == 0, 'cell editing bypasses native Markdown handlers'
+    click('.enhanced-table-controls > button')
+    click('[data-operation="insert-right"]')
+    assert js('return [...document.querySelectorAll("tr")].every(row=>row.cells.length===3)'), 'controller inserts a full unmerged column'
+    js('document.querySelector(".enhanced-table-controls > button").click(); document.querySelector(\'[data-operation="delete-column"]\').click(); return true')
+    assert js('return [...document.querySelectorAll("tr")].every(row=>row.cells.length===2)'), 'controller deletes the selected logical column'
+    click('td')
     js('document.querySelectorAll("td")[3].dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,shiftKey:true,button:0})); return true')
     assert js('return document.querySelectorAll("[data-enhanced-table-selected]").length') == 4, 'Shift selects rectangle'
     first_content = js('return document.querySelector("td").innerHTML')
@@ -70,7 +76,7 @@ try:
     (root / 'safari-inline.png').write_bytes(base64.b64decode(screenshot))
     js('plugin.unload(); return true')
     assert js('return !document.querySelector("td").isContentEditable'), 'unload restores preview'
-    print('PASS Safari: real typing, stable caret/table, rectangle merge/split shortcuts, clean source, rerender, unload')
+    print('PASS Safari: real typing, table controller, stable caret/table, rectangle merge/split shortcuts, clean source, rerender, unload')
 finally:
     request(path, method='DELETE')
     server.shutdown()

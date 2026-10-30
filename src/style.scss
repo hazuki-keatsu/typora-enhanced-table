@@ -1,3 +1,5 @@
+@use "controller";
+
 #write table[data-enhanced-table] {
 	[contenteditable="true"]:focus {
 		outline: 1px solid var(--select-text-bg-color, #508cf0);

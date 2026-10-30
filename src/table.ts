@@ -6,6 +6,15 @@ export interface CellRect {
 	right: number;
 }
 
+export type TableOperation =
+	| "insert-above"
+	| "insert-below"
+	| "insert-left"
+	| "insert-right"
+	| "delete-row"
+	| "delete-column"
+	| "set-header";
+
 export function tableGrid(table: HTMLTableElement): CellRect[] {
 	const occupied: boolean[][] = [];
 	const rects: CellRect[] = [];
@@ -90,4 +99,203 @@ export function splitCell(table: HTMLTableElement, cell: HTMLTableCellElement) {
 	}
 	cell.removeAttribute("rowspan");
 	cell.removeAttribute("colspan");
+}
+
+function structure(table: HTMLTableElement, cell: HTMLTableCellElement) {
+	const rects = tableGrid(table);
+	const selected = rects.find((rect) => rect.cell === cell);
+	if (!selected) throw Error("请选择表格内的单元格。");
+	const width = Math.max(...rects.map((rect) => rect.right)) + 1;
+	for (let row = 0; row < table.rows.length; row++) {
+		for (let column = 0; column < width; column++) {
+			if (
+				!rects.some(
+					(rect) =>
+						rect.top <= row &&
+						rect.bottom >= row &&
+						rect.left <= column &&
+						rect.right >= column,
+				)
+			)
+				throw Error("表格必须是完整的矩形。");
+		}
+	}
+	return { rects, selected, width };
+}
+
+function crossesRow(rect: CellRect, boundary: number) {
+	return rect.top < boundary && rect.bottom >= boundary;
+}
+
+function crossesColumn(rect: CellRect, boundary: number) {
+	return rect.left < boundary && rect.right >= boundary;
+}
+
+function cellAt(
+	table: HTMLTableElement,
+	row: number,
+	column: number,
+): HTMLTableCellElement {
+	const rects = tableGrid(table);
+	const found = rects.find(
+		(rect) =>
+			rect.top <= row &&
+			rect.bottom >= row &&
+			rect.left <= column &&
+			rect.right >= column,
+	);
+	if (!found) throw Error("表格结构已损坏。");
+	return found.cell;
+}
+
+function insertRow(
+	table: HTMLTableElement,
+	selected: CellRect,
+	width: number,
+	above: boolean,
+) {
+	const boundary = above ? selected.top : selected.bottom + 1;
+	if (tableGrid(table).some((rect) => crossesRow(rect, boundary)))
+		throw Error("不能从纵向合并单元格中间插入行。");
+	const reference = table.rows[above ? selected.top : selected.bottom];
+	const section = reference.parentElement;
+	if (!section || !["THEAD", "TBODY", "TFOOT"].includes(section.tagName))
+		throw Error("无法确定新行的位置。");
+	const row = (section as HTMLTableSectionElement).insertRow(
+		reference.sectionRowIndex + (above ? 0 : 1),
+	);
+	for (let column = 0; column < width; column++) row.insertCell();
+	return row.cells[Math.min(selected.left, width - 1)];
+}
+
+function insertColumn(
+	table: HTMLTableElement,
+	selected: CellRect,
+	left: boolean,
+) {
+	const rects = tableGrid(table);
+	const boundary = left ? selected.left : selected.right + 1;
+	if (rects.some((rect) => crossesColumn(rect, boundary)))
+		throw Error("不能从横向合并单元格中间插入列。");
+	let result: HTMLTableCellElement | undefined;
+	Array.from(table.rows).forEach((row, top) => {
+		const next = rects.find(
+			(rect) => rect.top === top && rect.left >= boundary,
+		)?.cell;
+		const cell = document.createElement("td");
+		row.insertBefore(cell, next ?? null);
+		if (top === selected.top) result = cell;
+	});
+	if (!result) throw Error("无法确定新列的位置。");
+	return result;
+}
+
+function deleteRows(
+	table: HTMLTableElement,
+	selected: CellRect,
+	rects: CellRect[],
+) {
+	if (selected.top === 0 && selected.bottom === table.rows.length - 1)
+		throw Error("不能删除表格的全部行。");
+	if (
+		rects.some(
+			(rect) =>
+				crossesRow(rect, selected.top) || crossesRow(rect, selected.bottom + 1),
+		)
+	)
+		throw Error("删除边界不能穿过其他纵向合并单元格。");
+	for (let row = selected.bottom; row >= selected.top; row--)
+		table.rows[row].remove();
+	return cellAt(
+		table,
+		Math.min(selected.top, table.rows.length - 1),
+		selected.left,
+	);
+}
+
+function deleteColumns(
+	table: HTMLTableElement,
+	selected: CellRect,
+	rects: CellRect[],
+	width: number,
+) {
+	if (selected.left === 0 && selected.right === width - 1)
+		throw Error("不能删除表格的全部列。");
+	if (
+		rects.some(
+			(rect) =>
+				crossesColumn(rect, selected.left) ||
+				crossesColumn(rect, selected.right + 1),
+		)
+	)
+		throw Error("删除边界不能穿过其他横向合并单元格。");
+	for (const rect of rects)
+		if (rect.left >= selected.left && rect.right <= selected.right)
+			rect.cell.remove();
+	return cellAt(
+		table,
+		Math.min(selected.top, table.rows.length - 1),
+		Math.min(selected.left, width - (selected.right - selected.left + 1) - 1),
+	);
+}
+
+function replaceCell(
+	cell: HTMLTableCellElement,
+	tag: "th" | "td",
+): HTMLTableCellElement {
+	if (cell.tagName.toLowerCase() === tag) return cell;
+	const replacement = document.createElement(tag);
+	for (const attribute of Array.from(cell.attributes))
+		replacement.setAttribute(attribute.name, attribute.value);
+	while (cell.firstChild) replacement.append(cell.firstChild);
+	cell.replaceWith(replacement);
+	return replacement;
+}
+
+function setHeader(
+	table: HTMLTableElement,
+	selected: CellRect,
+	rects: CellRect[],
+) {
+	if (selected.top !== 0) throw Error("只有第一行可以设置为表头。");
+	if (rects.some((rect) => rect.top === 0 && rect.bottom > 0))
+		throw Error("存在纵向合并单元格时不能设置表头。");
+	const row = table.rows[0];
+	const selectedIndex = Array.from(row.cells).indexOf(selected.cell);
+	const cells = Array.from(row.cells).map((cell) => replaceCell(cell, "th"));
+	if (row.parentElement !== table.tHead) {
+		const previousSection = row.parentElement;
+		const head = table.tHead ?? table.createTHead();
+		head.append(row);
+		if (
+			previousSection?.tagName === "TBODY" &&
+			previousSection.querySelectorAll(":scope > tr").length === 0
+		)
+			previousSection.remove();
+	}
+	return cells[selectedIndex];
+}
+
+export function applyTableOperation(
+	table: HTMLTableElement,
+	cell: HTMLTableCellElement,
+	operation: TableOperation,
+): HTMLTableCellElement {
+	const { rects, selected, width } = structure(table, cell);
+	switch (operation) {
+		case "insert-above":
+			return insertRow(table, selected, width, true);
+		case "insert-below":
+			return insertRow(table, selected, width, false);
+		case "insert-left":
+			return insertColumn(table, selected, true);
+		case "insert-right":
+			return insertColumn(table, selected, false);
+		case "delete-row":
+			return deleteRows(table, selected, rects);
+		case "delete-column":
+			return deleteColumns(table, selected, rects, width);
+		case "set-header":
+			return setHeader(table, selected, rects);
+	}
 }

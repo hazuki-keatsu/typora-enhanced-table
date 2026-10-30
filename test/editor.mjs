@@ -56,25 +56,43 @@ Object.defineProperty(window.navigator, "platform", { value: "MacIntel" });
 const original =
 	"<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>";
 let source = original;
+let nodeType = "html_block";
 const commands = [];
 const alerts = [];
 let failRegister = false;
 const node = {
-	get: () => source,
+	get: (key) => (key === "type" ? nodeType : source),
 	set: (_key, text) => {
 		source = text;
 	},
+	parseFrom: () => {
+		nodeType = "html_block";
+		return [
+			`<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${source}</div></div>`,
+			[node],
+		];
+	},
+	readFromJson: (json) => {
+		source = json.content.text;
+		nodeType = json.type;
+	},
+	toHTML: () =>
+		nodeType === "paragraph"
+			? '<p mdtype="paragraph" cid="n1">&lt;table&gt;</p>'
+			: `<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${source}</div></div>`,
 };
 window.hostFile = { isLocked: false };
 window.hostEditor = {
 	getNode: () => node,
+	store: () => {},
+	nodeMap: {},
 	sourceView: { inSourceMode: false },
 	undo: {
 		UndoManager: {
 			buildReplaceUndo: () => ({
 				type: "replace",
 				id: "n1",
-				json: { content: { text: source } },
+				json: { content: { text: source }, type: nodeType },
 			}),
 		},
 		register(command) {
@@ -458,8 +476,68 @@ try {
 		beforeRebind + 1,
 		"customized binding runs through the core registry",
 	);
+	plugin.unload();
+	source = "<table>";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1">&lt;table&gt;</p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const paragraph = document.querySelector("p");
+	const createRange = document.createRange();
+	createRange.selectNodeContents(paragraph);
+	createRange.collapse(false);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(createRange);
+	const create = new window.KeyboardEvent("keydown", {
+		key: "Enter",
+		bubbles: true,
+		cancelable: true,
+	});
+	paragraph.dispatchEvent(create);
+	assert.equal(
+		create.defaultPrevented,
+		true,
+		"Enter is consumed after exact <table>",
+	);
+	assert.equal(nodeType, "html_block");
+	assert.equal(source, "<table><tbody><tr><td></td></tr></tbody></table>");
+	assert.equal(document.querySelectorAll("table td").length, 1);
+	assert.equal(document.querySelector("td").contentEditable, "true");
+	assert.ok(document.querySelector("[data-enhanced-table-controls]"));
+	document.querySelector(".enhanced-table-controls > button").click();
+	document.querySelector('[data-operation="insert-right"]').click();
+	assert.equal(document.querySelectorAll("table td").length, 2);
+	assert.match(source, /<td><\/td><td><\/td>/);
+	plugin.unload();
+	source = "<table>";
+	nodeType = "paragraph";
+	failRegister = true;
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1">&lt;table&gt;</p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const failedParagraph = document.querySelector("p");
+	const failedRange = document.createRange();
+	failedRange.selectNodeContents(failedParagraph);
+	failedRange.collapse(false);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(failedRange);
+	failedParagraph.dispatchEvent(
+		new window.KeyboardEvent("keydown", {
+			key: "Enter",
+			bubbles: true,
+			cancelable: true,
+		}),
+	);
+	assert.equal(source, "<table>", "failed creation restores paragraph source");
+	assert.equal(nodeType, "paragraph");
+	assert.ok(document.querySelector('p[mdtype="paragraph"]'));
+	failRegister = false;
 	console.log(
-		"PASS inline editor: live DOM, input persistence, native snapshots, merge/split, IME, export, conflict, locks, rollback, undo/redo rerender",
+		"PASS inline editor: live DOM, table creation/controller, native snapshots, merge/split, IME, export, conflict, locks, rollback, undo/redo rerender",
 	);
 } finally {
 	plugin?.unload();

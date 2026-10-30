@@ -1,0 +1,65 @@
+.md-htmlblock-container {
+	position: relative;
+}
+
+.enhanced-table-controls {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 3;
+
+	> button {
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border: 1px solid var(--table-border-color, #ddd);
+		border-radius: 4px;
+		background: var(--bg-color, #fff);
+		color: var(--text-color, #333);
+		cursor: pointer;
+	}
+}
+
+.enhanced-table-controller-popup {
+	position: absolute;
+	top: 26px;
+	left: 0;
+	display: grid;
+	min-width: 150px;
+	padding: 6px;
+	border: 1px solid var(--table-border-color, #ddd);
+	border-radius: 6px;
+	background: var(--bg-color, #fff);
+	box-shadow: 0 4px 14px rgb(0 0 0 / 16%);
+
+	&[hidden] {
+		display: none;
+	}
+
+	p {
+		margin: 4px 8px;
+		color: var(--text-color, #666);
+		font-size: 12px;
+	}
+
+	button {
+		padding: 5px 8px;
+		border: 0;
+		border-radius: 3px;
+		background: transparent;
+		color: var(--text-color, #333);
+		text-align: left;
+		white-space: nowrap;
+		cursor: pointer;
+
+		&:hover:not(:disabled),
+		&:focus-visible {
+			background: var(--item-hover-bg-color, rgb(128 128 128 / 14%));
+		}
+
+		&:disabled {
+			opacity: 0.45;
+			cursor: default;
+		}
+	}
+}
