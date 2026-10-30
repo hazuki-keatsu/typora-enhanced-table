@@ -1,10 +1,13 @@
-# 实现检查
+# 原地编辑检查
 
-- [x] 调查 HTMLBlock 写回路径与社区扩展 API。
-- [x] 比较原地 DOM 修改、独立模态窗、原位置可视层；选择原位置层，避免无模型持久化的 DOM 修改。
-- [x] Blocking first steps：先确认写回接口，再开发交互。
-- [x] Independent workstreams：src/测试与构建/文档分配不同文件所有权。
-- [x] Shared mutable state：单个编辑会话，保存前校验原文。
-- [x] Smallest safe decomposition：一名实现代理负责相互耦合的表格及编辑层，主代理审查并完成集成。
-- [x] 验证表格操作、编辑交互、类型、构建、包内容。
-- [ ] Typora 真实保存/撤销/重开；skip: 当前无可用界面驱动，Safari 未开启远程自动化。
+- [x] Ground：核实 HTML 渲染、后处理和原生撤销记录路径。
+- [x] Sketch：比较重绘写回和节点快照写回，见 inline-design.md。
+- [x] Agree：采用安全渲染后的表格 DOM + 节点快照，不复制浮层。
+- [x] Implement：先观察新交互测试失败，再改实现。
+- [x] Scrap：节点快照通过自动验证，无需重设；宿主实机兼容性仍需复验。
+- [x] Blocking first steps：先验证私有接口及 Safari 自动化。
+- [x] Independent workstreams：代理独立工作树负责代码/集成测试，主线程负责浏览器驱动/文档。
+- [x] Shared mutable state：单个表格会话关联 DOM 与模型，写回前检查版本。
+- [x] Smallest safe decomposition：耦合实现由一名代理完成，主线程独立验收。
+- [x] DOM 回归、类型检查、真实 Safari 输入和构建。
+- [x] 完成代码与验证记录；提交、推送结果见交付回复。

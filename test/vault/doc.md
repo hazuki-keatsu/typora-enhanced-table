@@ -1,6 +1,6 @@
 # Enhanced Table 开发样例
 
-点击下方 HTML 表格，在原位置编辑。点击一个格子，再 Shift 点击另一个格子选择矩形，合并或拆分后点保存。
+直接点击下方 HTML 表格编辑文字。点击一个格子，再 Shift 点击另一个格子选择矩形，用 Cmd/Ctrl+Shift+M 或右键菜单合并，Cmd/Ctrl+Shift+U 拆分。按 Typora 原生保存快捷键保存文件。
 
 <table>
 <thead><tr><th>项目</th><th>第一季度</th><th>第二季度</th></tr></thead>

@@ -7,10 +7,15 @@ const result = await build({
   plugins: [{ name: 'host-boundary', setup(build) {
     build.onResolve({ filter: /^(@typora-community-plugin\/core|typora)$/ }, args => ({ path: args.path, namespace: 'host' }))
     build.onLoad({ filter: /.*/, namespace: 'host' }, args => ({ contents: args.path === 'typora'
-      ? 'export const editor = globalThis.hostEditor'
-      : `export class Plugin {
-          commands = []; disposables = [];
+      ? 'export const editor = globalThis.hostEditor; export const File = globalThis.hostFile'
+      : `export class HtmlPostProcessor { static from(options) { return options } }
+        export class HtmlExportProcessor { static from(options) { return options } }
+        export class Plugin {
+          commands = []; disposables = []; processors = []; exporters = [];
+          app = { features: { exporter: { register: processor => { this.exporters.push(processor); return () => {} } } } };
+          register(dispose) { this.disposables.push(dispose) }
           registerCommand(command) { this.commands.push(command) }
+          registerMarkdownPostProcessor(processor) { this.processors.push(processor) }
           registerDomEvent(target, name, callback, options) {
             target.addEventListener(name, callback, options);
             this.disposables.push(() => target.removeEventListener(name, callback, options));
@@ -22,70 +27,173 @@ const result = await build({
 })
 const window = new Window()
 const { document } = window
-const calls = []
+const original = '<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>'
+let source = original
+const commands = []
 const alerts = []
-let source = '<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>'
+let failRegister = false
+const node = { get: () => source, set: (_key, text) => { source = text } }
+window.hostFile = { isLocked: false }
 window.hostEditor = {
-  getNode: () => ({ get: () => source }),
-  htmlBlock: {
-    startEditing(cid) { calls.push(['start', cid]); return { setValue(html) { calls.push(['value', html]) } } },
-    stopEditing(cid) { calls.push(['stop', cid]) },
+  getNode: () => node,
+  sourceView: { inSourceMode: false },
+  undo: {
+    UndoManager: { buildReplaceUndo: () => ({ type: 'replace', id: 'n1', json: { content: { text: source } } }) },
+    register(command) { if (failRegister) throw Error('register failed'); commands.push(command) },
   },
 }
 window.alert = message => alerts.push(message)
 window.eval(result.outputFiles[0].text)
-const plugin = new window.TablePlugin.default()
-plugin.onload()
-const overlay = () => document.querySelector('.enhanced-table-overlay')
-function open(preview = source) {
-  document.body.innerHTML = `<div id="write"><div class="md-htmlblock" cid="n1">${preview}</div></div>`
-  const cell = document.querySelector('td')
-  const down = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 })
-  let reachedTypora = false
-  const nativeHandler = () => { reachedTypora = true }
-  document.querySelector('#write').addEventListener('mousedown', nativeHandler)
-  cell.dispatchEvent(down)
-  assert.equal(down.defaultPrevented, true)
-  assert.equal(reachedTypora, false, 'native source editor must never receive mousedown')
+let plugin
+function setup(preview = source) {
+  if (plugin) plugin.unload()
+  document.body.innerHTML = `<div id="write"><div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${preview}</div></div></div>`
+  window.hostEditor.writingArea = document.querySelector('#write')
+  plugin = new window.TablePlugin.default()
+  plugin.onload()
+  return document.querySelector('table')
 }
-function button(label) { return Array.from(overlay().querySelectorAll('button')).find(b => b.textContent === label) }
+function mouse(cell, shiftKey = false, button = 0) {
+  const event = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, shiftKey, button })
+  cell.dispatchEvent(event)
+  return event
+}
+function input(cell, text, isComposing = false) {
+  cell.textContent = text
+  cell.dispatchEvent(new window.InputEvent('input', { bubbles: true, isComposing }))
+}
+function command(id) { plugin.commands.find(c => c.id === id).callback() }
+function processAgain() { plugin.processors.forEach(p => document.querySelectorAll(p.selector).forEach(el => p.process(el, { containerEl: window.hostEditor.writingArea }))) }
 try {
-  open()
-  assert.ok(overlay(), 'primary pointer action opens visual editor')
-  const cells = overlay().querySelectorAll('td')
-  cells[0].dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
-  cells[3].dispatchEvent(new window.MouseEvent('click', { bubbles: true, shiftKey: true }))
-  assert.equal(overlay().querySelectorAll('[data-enhanced-table-selected]').length, 4, 'Shift selects rectangle')
-  cells[0].textContent = 'Edited'
-  plugin.commands.find(c => c.id === 'merge').callback()
-  assert.equal(overlay().querySelectorAll('td').length, 1)
-  button('保存').click()
-  assert.equal(overlay(), null)
-  assert.deepEqual(calls.map(c => c[0]), ['start', 'value', 'stop'])
-  assert.equal(calls[0][1], 'n1')
-  const output = new window.DOMParser().parseFromString(calls[1][1], 'text/html')
-  assert.equal(output.querySelector('td').textContent, 'EditedBCD')
-  assert.equal(output.querySelector('td').rowSpan, 2)
-  assert.equal(output.querySelector('td').colSpan, 2)
-  assert.equal(output.querySelector('[contenteditable], [tabindex], [data-enhanced-table-selected]'), null)
-  calls.length = 0
-  open()
-  overlay().querySelector('td').textContent = 'Discarded'
-  button('取消').click()
-  assert.equal(overlay(), null)
-  assert.equal(calls.length, 0, 'cancel never writes host document')
-  open(source.replace('>A<', '>Different<'))
-  assert.equal(overlay(), null, 'source/preview mismatch refused')
-  assert.match(alerts.at(-1), /数据丢失/)
-  open()
-  const original = source
-  source = source.replace('>A<', '>Changed externally<')
-  button('保存').click()
-  assert.match(overlay().querySelector('[role=status]').textContent, /文档已改变/)
-  assert.equal(calls.length, 0, 'conflict never writes host document')
-  source = original
+  let table = setup()
+  assert.ok(!document.querySelector('.enhanced-table-overlay, .enhanced-table-toolbar'), 'inline edit never opens overlay or toolbar')
+  assert.equal(table.rows[0].cells[0].contentEditable, 'true', 'initial scan enables original cells')
+  const cell = table.rows[0].cells[0]
+  let nativeMouse = 0
+  document.querySelector('#write').addEventListener('mousedown', () => nativeMouse++)
+  const down = mouse(cell)
+  assert.equal(down.defaultPrevented, false, 'ordinary editing retains browser caret placement')
+  assert.equal(nativeMouse, 0, 'Typora source editor receives no mousedown')
+  for (const name of ['copy', 'cut', 'keypress', 'compositionstart', 'compositionupdate', 'compositionend']) {
+    let nativeHandler = 0
+    document.querySelector('#write').addEventListener(name, () => nativeHandler++)
+    const event = new window.Event(name, { bubbles: true, cancelable: true })
+    cell.dispatchEvent(event)
+    assert.equal(nativeHandler, 0, `${name} cannot reach native Markdown block handling`)
+    assert.equal(event.defaultPrevented, false, `${name} retains browser default behavior`)
+  }
+  const range = document.createRange()
+  range.selectNodeContents(cell)
+  range.collapse(false)
+  window.getSelection().addRange(range)
+  input(cell, 'Edited')
+  assert.equal(document.querySelector('table'), table, 'typing retains original table identity')
+  assert.equal(window.getSelection().anchorNode, cell, 'commit never resets the selection container')
+  assert.match(source, />Edited</)
+  assert.equal(commands.length, 1)
+  assert.equal(commands[0].undo[0].id, 'n1')
+  assert.equal(commands[0].undo[0].json.content.text, original)
+  assert.equal(commands[0].redo[0].json.content.text, source)
+  assert.doesNotMatch(source, /contenteditable|data-enhanced-table/)
+  const decorated = table.outerHTML
+  processAgain()
+  assert.equal(table.outerHTML, decorated, 'postprocessor is idempotent')
+  let nativeSave = 0
+  document.querySelector('#write').addEventListener('keydown', event => { if (event.key === 's') nativeSave++ })
+  cell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true, cancelable: true }))
+  assert.equal(nativeSave, 1, 'save shortcut reaches native handler with current model')
+  mouse(cell)
+  mouse(table.rows[1].cells[1], true)
+  assert.equal(table.querySelectorAll('[data-enhanced-table-selected]').length, 4)
+  const keyCommands = commands.length
+  cell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+  let coreKeyup = 0
+  document.querySelector('#write').addEventListener('keyup', () => coreKeyup++)
+  cell.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'm', metaKey: true, shiftKey: true, bubbles: true }))
+  assert.equal(coreKeyup, 0, 'keyup cannot invoke core merge shortcut a second time')
+  assert.equal(commands.length, keyCommands + 1)
+  assert.equal(table.querySelectorAll('td').length, 1)
+  assert.equal(table.rows[0].cells[0].textContent, 'EditedBCD')
+  assert.match(source, /rowspan="2"/)
+  command('split')
+  assert.equal(table.rows[1].cells.length, 2)
+  assert.equal(document.querySelector('table'), table)
+  const lastCell = table.rows[1].cells[1]
+  mouse(lastCell)
+  const leaveTable = new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+  lastCell.dispatchEvent(leaveTable)
+  assert.equal(leaveTable.defaultPrevented, false, 'Tab at table boundary must not trap keyboard focus')
+  mouse(cell)
+  const beforeComposition = commands.length
+  cell.dispatchEvent(new window.CompositionEvent('compositionstart', { bubbles: true }))
+  input(cell, '输入中', true)
+  const compositionSave = new window.KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true, cancelable: true })
+  cell.dispatchEvent(compositionSave)
+  assert.equal(compositionSave.defaultPrevented, true, 'save waits for composition completion')
+  assert.equal(commands.length, beforeComposition, 'IME intermediate input is not persisted')
+  cell.dispatchEvent(new window.CompositionEvent('compositionend', { bubbles: true }))
+  assert.equal(commands.length, beforeComposition + 1)
+  assert.match(source, /输入中/)
+  cell.dispatchEvent(new window.InputEvent('input', { bubbles: true }))
+  assert.equal(commands.length, beforeComposition + 1, 'trailing composition input adds no duplicate undo')
+  const exportDoc = new window.DOMParser().parseFromString(document.body.innerHTML, 'text/html')
+  plugin.exporters.forEach(p => p.process({ doc: exportDoc }))
+  assert.doesNotMatch(exportDoc.querySelector('table').outerHTML, /contenteditable|data-enhanced-table/)
+  const snapshots = commands.length
+  source = '<table><tbody><tr><td>External change</td></tr></tbody></table>'
+  input(cell, 'Recoverable')
+  assert.equal(commands.length, snapshots, 'conflict refuses overwrite')
+  assert.match(source, /External change/)
+  assert.match(alerts.at(-1), /文档已改变/)
+  assert.equal(cell.textContent, 'Recoverable', 'failed input stays available to copy')
   plugin.unload()
-  assert.equal(overlay(), null, 'unload removes visual editor')
-  assert.equal(calls.length, 0)
-  console.log('PASS editor integration: interception, rectangle, merge, save, cancel, mismatch, conflict, unload')
-} finally { await window.happyDOM.close() }
+  plugin = undefined
+  assert.doesNotMatch(table.outerHTML, /contenteditable|data-enhanced-table/)
+  source = original
+  table = setup(source.replace('>A<', '>Mismatch<'))
+  assert.equal(table.rows[0].cells[0].hasAttribute('contenteditable'), false, 'sanitized mismatch stays native')
+  source = original
+  table = setup()
+  mouse(table.rows[0].cells[0])
+  window.hostFile.isLocked = true
+  const blocked = new window.InputEvent('beforeinput', { bubbles: true, cancelable: true })
+  table.rows[0].cells[0].dispatchEvent(blocked)
+  assert.equal(blocked.defaultPrevented, true, 'locked document blocks input')
+  window.hostFile.isLocked = false
+  window.hostEditor.sourceView.inSourceMode = true
+  const sourceMode = new window.InputEvent('beforeinput', { bubbles: true, cancelable: true })
+  table.rows[0].cells[0].dispatchEvent(sourceMode)
+  assert.equal(sourceMode.defaultPrevented, true)
+  window.hostEditor.sourceView.inSourceMode = false
+  failRegister = true
+  input(table.rows[0].cells[0], 'Failed write')
+  assert.equal(source, original, 'failed undo registration rolls back model text')
+  failRegister = false
+  input(table.rows[0].cells[0], 'Retry')
+  assert.match(source, /Retry/)
+  const last = commands.at(-1)
+  let undoCalls = 0
+  window.hostEditor.undo.undo = () => {
+    undoCalls++
+    source = last.undo[0].json.content.text
+    document.querySelector('.md-htmlblock-container').innerHTML = source
+    processAgain()
+  }
+  const undoKey = new window.KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true, cancelable: true })
+  table.rows[0].cells[0].dispatchEvent(undoKey)
+  assert.equal(undoCalls, 1, 'keyboard undo routes to Typora snapshots')
+  assert.equal(undoKey.defaultPrevented, true, 'browser undo cannot mutate cell behind model')
+  const redo = commands.at(-1).redo[0].json.content.text
+  source = commands.at(-1).undo[0].json.content.text
+  document.querySelector('.md-htmlblock-container').innerHTML = source
+  processAgain()
+  assert.equal(document.querySelector('td').contentEditable, 'true', 'native undo rerender is enabled again')
+  source = redo
+  document.querySelector('.md-htmlblock-container').innerHTML = source
+  processAgain()
+  assert.equal(document.querySelector('td').contentEditable, 'true', 'native redo rerender is enabled again')
+  document.querySelector('.md-htmlblock-container').innerHTML = source
+  await new Promise(resolve => setTimeout(resolve, 10))
+  assert.equal(document.querySelector('td').contentEditable, 'true', 'render replacement rebinds without a core edit notification')
+  console.log('PASS inline editor: live DOM, input persistence, native snapshots, merge/split, IME, export, conflict, locks, rollback, undo/redo rerender')
+} finally { plugin?.unload(); await window.happyDOM.close() }
