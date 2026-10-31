@@ -1,5 +1,6 @@
 import type { TableOperation } from "./table";
 import { menuIcon, renderHotkey } from "./icons";
+import { t, type MessageKey } from "./locale";
 
 type MenuOperation =
 	| TableOperation
@@ -10,27 +11,27 @@ type MenuOperation =
 
 let controllerId = 0;
 
-const operations: [MenuOperation, string][][] = [
+const operations: [MenuOperation, MessageKey][][] = [
 	[
-		["insert-above", "上方插入行"],
-		["insert-below", "下方插入行"],
+		["insert-above", "insertRowAbove"],
+		["insert-below", "insertRowBelow"],
 	],
 	[
-		["insert-left", "左侧插入列"],
-		["insert-right", "右侧插入列"],
+		["insert-left", "insertColumnLeft"],
+		["insert-right", "insertColumnRight"],
 	],
 	[
-		["delete-row", "删除所在行"],
-		["delete-column", "删除所在列"],
+		["delete-row", "deleteSelectedRows"],
+		["delete-column", "deleteSelectedColumns"],
 	],
 	[
-		["merge", "合并单元格"],
-		["split", "拆分单元格"],
-		["set-header", "将首行设为表头"],
+		["merge", "mergeCells"],
+		["split", "splitCell"],
+		["set-header", "setHeader"],
 	],
 	[
-		["copy-table", "复制表格"],
-		["delete-table", "删除表格"],
+		["copy-table", "copyTable"],
+		["delete-table", "deleteTable"],
 	],
 ];
 
@@ -50,8 +51,8 @@ export function attachTableController(
 	const trigger = doc.createElement("button");
 	trigger.type = "button";
 	trigger.append(menuIcon());
-	trigger.title = "表格操作";
-	trigger.setAttribute("aria-label", "表格操作");
+	trigger.title = t("tableActions");
+	trigger.setAttribute("aria-label", t("tableActions"));
 	trigger.setAttribute("aria-expanded", "false");
 	const popup = doc.createElement("div");
 	popup.id = `enhanced-table-controller-${++controllerId}`;
@@ -67,7 +68,7 @@ export function attachTableController(
 		return items.map(([operation, text]) => {
 			const button = doc.createElement("button");
 			button.type = "button";
-			button.textContent = text;
+			button.textContent = t(text);
 			const hint = doc.createElement("span");
 			hint.className = "enhanced-table-hotkey";
 			button.append(hint);

@@ -32,13 +32,13 @@ export function tableGrid(table: HTMLTableElement): CellRect[] {
 						1
 					: top + cell.rowSpan - 1;
 			const right = left + cell.colSpan - 1;
-			if (bottom >= table.rows.length) throw Error("单元格跨越了表格边界。");
+			if (bottom >= table.rows.length) throw Error("cellOutsideTable");
 			for (let y = top; y <= bottom; y++) {
 				if (table.rows[y].parentElement !== row.parentElement)
-					throw Error("单元格不能跨越表头和表体。");
+					throw Error("cellCrossesSections");
 				occupied[y] ??= [];
 				for (let x = left; x <= right; x++) {
-					if (occupied[y][x]) throw Error("表格存在重叠单元格。");
+					if (occupied[y][x]) throw Error("overlappingCells");
 					occupied[y][x] = true;
 				}
 			}
@@ -55,19 +55,19 @@ export function mergeCells(
 ): HTMLTableCellElement {
 	const rects = tableGrid(table);
 	const chosen = rects.filter((r) => selected.includes(r.cell));
-	if (chosen.length < 2) throw Error("请按住 Shift 点击选择至少两个单元格。");
+	if (chosen.length < 2) throw Error("selectMultipleCells");
 	const top = Math.min(...chosen.map((r) => r.top));
 	const left = Math.min(...chosen.map((r) => r.left));
 	const bottom = Math.max(...chosen.map((r) => r.bottom));
 	const right = Math.max(...chosen.map((r) => r.right));
 	if (table.rows[top].parentElement !== table.rows[bottom].parentElement)
-		throw Error("不能跨越表头和表体合并。");
+		throw Error("mergeAcrossSections");
 	const area = chosen.reduce(
 		(sum, r) => sum + (r.bottom - r.top + 1) * (r.right - r.left + 1),
 		0,
 	);
 	if (area !== (bottom - top + 1) * (right - left + 1))
-		throw Error("请选择完整的矩形区域。");
+		throw Error("selectRectangle");
 	const first = chosen[0];
 	first.cell.rowSpan = bottom - top + 1;
 	first.cell.colSpan = right - left + 1;
@@ -88,7 +88,7 @@ export function mergeCells(
 export function splitCell(table: HTMLTableElement, cell: HTMLTableCellElement) {
 	const rects = tableGrid(table);
 	const rect = rects.find((r) => r.cell === cell);
-	if (!rect) throw Error("请选择表格内的单元格。");
+	if (!rect) throw Error("selectTableCell");
 	for (let y = rect.top; y <= rect.bottom; y++) {
 		for (let x = rect.left; x <= rect.right; x++) {
 			if (y === rect.top && x === rect.left) continue;
@@ -104,7 +104,7 @@ export function splitCell(table: HTMLTableElement, cell: HTMLTableCellElement) {
 function structure(table: HTMLTableElement, cell: HTMLTableCellElement) {
 	const rects = tableGrid(table);
 	const selected = rects.find((rect) => rect.cell === cell);
-	if (!selected) throw Error("请选择表格内的单元格。");
+	if (!selected) throw Error("selectTableCell");
 	const width = Math.max(...rects.map((rect) => rect.right)) + 1;
 	for (let row = 0; row < table.rows.length; row++) {
 		for (let column = 0; column < width; column++) {
@@ -117,7 +117,7 @@ function structure(table: HTMLTableElement, cell: HTMLTableCellElement) {
 						rect.right >= column,
 				)
 			)
-				throw Error("表格必须是完整的矩形。");
+				throw Error("tableNotRectangular");
 		}
 	}
 	return { rects, selected, width };
@@ -144,7 +144,7 @@ function cellAt(
 			rect.left <= column &&
 			rect.right >= column,
 	);
-	if (!found) throw Error("表格结构已损坏。");
+	if (!found) throw Error("invalidTable");
 	return found.cell;
 }
 
@@ -156,11 +156,11 @@ function insertRow(
 ) {
 	const boundary = above ? selected.top : selected.bottom + 1;
 	if (tableGrid(table).some((rect) => crossesRow(rect, boundary)))
-		throw Error("不能从纵向合并单元格中间插入行。");
+		throw Error("insertRowCrossesMerge");
 	const reference = table.rows[above ? selected.top : selected.bottom];
 	const section = reference.parentElement;
 	if (!section || !["THEAD", "TBODY", "TFOOT"].includes(section.tagName))
-		throw Error("无法确定新行的位置。");
+		throw Error("rowPositionUnknown");
 	const row = (section as HTMLTableSectionElement).insertRow(
 		reference.sectionRowIndex + (above ? 0 : 1),
 	);
@@ -176,7 +176,7 @@ function insertColumn(
 	const rects = tableGrid(table);
 	const boundary = left ? selected.left : selected.right + 1;
 	if (rects.some((rect) => crossesColumn(rect, boundary)))
-		throw Error("不能从横向合并单元格中间插入列。");
+		throw Error("insertColumnCrossesMerge");
 	let result: HTMLTableCellElement | undefined;
 	Array.from(table.rows).forEach((row, top) => {
 		const next = rects.find(
@@ -186,7 +186,7 @@ function insertColumn(
 		row.insertBefore(cell, next ?? null);
 		if (top === selected.top) result = cell;
 	});
-	if (!result) throw Error("无法确定新列的位置。");
+	if (!result) throw Error("columnPositionUnknown");
 	return result;
 }
 
@@ -196,14 +196,14 @@ function deleteRows(
 	rects: CellRect[],
 ) {
 	if (selected.top === 0 && selected.bottom === table.rows.length - 1)
-		throw Error("不能删除表格的全部行。");
+		throw Error("deleteAllRows");
 	if (
 		rects.some(
 			(rect) =>
 				crossesRow(rect, selected.top) || crossesRow(rect, selected.bottom + 1),
 		)
 	)
-		throw Error("删除边界不能穿过其他纵向合并单元格。");
+		throw Error("deleteRowCrossesMerge");
 	for (let row = selected.bottom; row >= selected.top; row--)
 		table.rows[row].remove();
 	return cellAt(
@@ -220,7 +220,7 @@ function deleteColumns(
 	width: number,
 ) {
 	if (selected.left === 0 && selected.right === width - 1)
-		throw Error("不能删除表格的全部列。");
+		throw Error("deleteAllColumns");
 	if (
 		rects.some(
 			(rect) =>
@@ -228,7 +228,7 @@ function deleteColumns(
 				crossesColumn(rect, selected.right + 1),
 		)
 	)
-		throw Error("删除边界不能穿过其他横向合并单元格。");
+		throw Error("deleteColumnCrossesMerge");
 	for (const rect of rects)
 		if (rect.left >= selected.left && rect.right <= selected.right)
 			rect.cell.remove();
@@ -257,9 +257,9 @@ function setHeader(
 	selected: CellRect,
 	rects: CellRect[],
 ) {
-	if (selected.top !== 0) throw Error("只有第一行可以设置为表头。");
+	if (selected.top !== 0) throw Error("headerFirstRowOnly");
 	if (rects.some((rect) => rect.top === 0 && rect.bottom > 0))
-		throw Error("存在纵向合并单元格时不能设置表头。");
+		throw Error("headerVerticalMerge");
 	const row = table.rows[0];
 	const selectedIndex = Array.from(row.cells).indexOf(selected.cell);
 	const cells = Array.from(row.cells).map((cell) => replaceCell(cell, "th"));

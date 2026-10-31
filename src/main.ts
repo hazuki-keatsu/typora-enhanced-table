@@ -2,6 +2,7 @@ import "./style.scss";
 import * as Core from "@typora-community-plugin/core";
 import { editor, File } from "typora";
 import { attachTableController } from "./controller";
+import { setLocale, t, translateError } from "./locale";
 import {
 	applyTableOperation,
 	mergeCells,
@@ -47,7 +48,7 @@ const emptyTable = "<table><tbody><tr><td></td></tr></tbody></table>";
 
 function clean(table: HTMLTableElement) {
 	const copy = table.cloneNode(true);
-	if (!(copy instanceof HTMLTableElement)) throw Error("无法读取表格。");
+	if (!(copy instanceof HTMLTableElement)) throw Error("cannotReadTable");
 	copy.removeAttribute(marker);
 	copy.querySelectorAll("td, th").forEach((cell) => {
 		cell.removeAttribute("contenteditable");
@@ -62,6 +63,12 @@ function writable() {
 	);
 }
 
+function showError(error: unknown) {
+	window.alert(
+		error instanceof Error ? translateError(error.message) : String(error),
+	);
+}
+
 function undoAPI(): NativeUndo {
 	// shortcut: Typora has no public HTML write API; recheck native snapshots after upgrades.
 	const undo = editor.undo;
@@ -73,7 +80,7 @@ function undoAPI(): NativeUndo {
 		!("buildReplaceUndo" in undo.UndoManager) ||
 		typeof undo.UndoManager.buildReplaceUndo !== "function"
 	) {
-		throw Error("当前 Typora 不支持表格编辑所需的撤销接口。");
+		throw Error("undoInterfaceUnavailable");
 	}
 	return undo as unknown as NativeUndo;
 }
@@ -84,24 +91,25 @@ export default class EnhancedTable extends Plugin {
 	private controllers = new Map<HTMLTableElement, () => void>();
 
 	onload() {
+		setLocale(this.app.i18n?.locale ?? navigator.language ?? "en");
 		this.interceptNavigation();
 		this.registerCommand({
 			id: "merge",
-			title: "合并单元格",
+			title: t("mergeCells"),
 			scope: "editor",
 			hotkey: "ctrl+shift+m",
 			callback: () => this.change("merge"),
 		});
 		this.registerCommand({
 			id: "split",
-			title: "拆分单元格",
+			title: t("splitCell"),
 			scope: "editor",
 			hotkey: "ctrl+shift+u",
 			callback: () => this.change("split"),
 		});
 		this.registerCommand({
 			id: "insert-row-below",
-			title: "下方插入行",
+			title: t("insertRowBelow"),
 			scope: "editor",
 			hotkey: "ctrl+enter",
 			callback: () => {
@@ -111,7 +119,7 @@ export default class EnhancedTable extends Plugin {
 		});
 		this.registerCommand({
 			id: "delete-row",
-			title: "删除行",
+			title: t("deleteRow"),
 			scope: "editor",
 			hotkey: "ctrl+shift+backspace",
 			callback: () => {
@@ -309,7 +317,7 @@ export default class EnhancedTable extends Plugin {
 						} catch (error) {
 							event.preventDefault();
 							event.stopImmediatePropagation();
-							window.alert(String(error));
+							showError(error);
 						}
 						return;
 					}
@@ -322,7 +330,7 @@ export default class EnhancedTable extends Plugin {
 							const undo = undoAPI();
 							const operation = key === "y" || event.shiftKey ? "redo" : "undo";
 							if (typeof undo[operation] !== "function")
-								throw Error("当前 Typora 不支持原生撤销。");
+								throw Error("nativeUndoUnavailable");
 							this.clearSelection();
 							this.session = undefined;
 							undo[operation]?.();
@@ -550,7 +558,7 @@ export default class EnhancedTable extends Plugin {
 						void navigator.clipboard
 							.writeText(clean(table))
 							.catch((error: unknown) => {
-								window.alert(String(error));
+								showError(error);
 							});
 					} else this.changeStructure(table, operation);
 				},
@@ -571,7 +579,7 @@ export default class EnhancedTable extends Plugin {
 				editor.getNode(session.cid) !== session.node ||
 				session.node.get("text") !== session.lastCommitted
 			)
-				throw Error("文档已改变或被锁定。");
+				throw Error("documentChanged");
 			const node = session.node as MutableEditorNode;
 			const host = editor as MutableEditor;
 			if (
@@ -579,9 +587,9 @@ export default class EnhancedTable extends Plugin {
 				typeof node.readFromJson !== "function" ||
 				typeof node.toHTML !== "function"
 			)
-				throw Error("当前 Typora 不支持删除表格。");
+				throw Error("deleteTableUnavailable");
 			const block = table.closest<HTMLElement>(".md-htmlblock");
-			if (!block) throw Error("无法找到表格所在文档块。");
+			if (!block) throw Error("tableBlockMissing");
 			const undo = undoAPI();
 			undo.endSnap?.(true);
 			const before = undo.UndoManager.buildReplaceUndo(node);
@@ -595,7 +603,7 @@ export default class EnhancedTable extends Plugin {
 					nodes[0] !== node ||
 					node.get("type") !== "paragraph"
 				)
-					throw Error("无法将表格转换为空段落。");
+					throw Error("emptyParagraphConversionFailed");
 				const after = undo.UndoManager.buildReplaceUndo(node);
 				undo.register({ undo: [before], redo: [after] });
 				this.disable(table);
@@ -691,9 +699,7 @@ export default class EnhancedTable extends Plugin {
 			editor.getNode(session.cid) !== session.node ||
 			session.node.get("text") !== session.lastCommitted
 		) {
-			throw Error(
-				"文档已改变或被锁定；表格中的未保存内容仍可复制，请重新打开文档后重试。",
-			);
+			throw Error("unsavedTableConflict");
 		}
 		const output = clean(session.table);
 		if (
@@ -726,12 +732,12 @@ export default class EnhancedTable extends Plugin {
 				editor.getNode(session.cid) !== session.node ||
 				session.node.get("text") !== session.lastCommitted
 			)
-				throw Error("文档已改变或被锁定。");
+				throw Error("documentChanged");
 			if (operation === "merge") {
 				const cell = mergeCells(session.table, session.selected);
 				this.select(cell, false);
 			} else {
-				if (session.selected.length !== 1) throw Error("请选择一个单元格。");
+				if (session.selected.length !== 1) throw Error("selectOneCell");
 				splitCell(session.table, session.selected[0]);
 			}
 			this.prepare(session.table);
@@ -748,13 +754,13 @@ export default class EnhancedTable extends Plugin {
 				session.composing ||
 				session.selected.length !== 1
 			)
-				throw Error("请先选中一个单元格。");
+				throw Error("selectCellFirst");
 			if (
 				!writable() ||
 				editor.getNode(session.cid) !== session.node ||
 				session.node.get("text") !== session.lastCommitted
 			)
-				throw Error("文档已改变或被锁定。");
+				throw Error("documentChanged");
 			const cell = applyTableOperation(table, session.selected[0], operation);
 			this.prepare(table);
 			this.select(cell, false);
@@ -822,7 +828,7 @@ export default class EnhancedTable extends Plugin {
 					skips: { old_code: false, pass_format: true },
 				});
 				if (nodes.length !== 1 || nodes[0] !== node)
-					throw Error("无法将输入转换为单个 HTML 表格块。");
+					throw Error("tableConversionFailed");
 				paragraph.outerHTML = html;
 				const block = Array.from(editor.writingArea?.children ?? []).find(
 					(element) => element.getAttribute("cid") === cid,
@@ -831,11 +837,10 @@ export default class EnhancedTable extends Plugin {
 					":scope > .md-htmlblock-container > table",
 				);
 				if (!(table instanceof HTMLTableElement))
-					throw Error("Typora 没有生成可编辑的表格预览。");
+					throw Error("tablePreviewMissing");
 				createdTable = table;
 				this.enable(table);
-				if (!table.hasAttribute(marker))
-					throw Error("生成的表格无法进入编辑模式。");
+				if (!table.hasAttribute(marker)) throw Error("tableEditUnavailable");
 				const after = undo.UndoManager.buildReplaceUndo(node);
 				undo.register({ undo: [before], redo: [after] });
 				const cell = table.querySelector<HTMLTableCellElement>("td, th");
@@ -860,7 +865,7 @@ export default class EnhancedTable extends Plugin {
 		try {
 			action();
 		} catch (error) {
-			window.alert(String(error));
+			showError(error);
 		}
 	}
 }

@@ -20,6 +20,22 @@ const result = await build({
 	bundle: true,
 	write: false,
 	format: "esm",
+	plugins: [
+		{
+			name: "core-i18n",
+			setup(build) {
+				build.onResolve({ filter: /^@typora-community-plugin\/core$/ }, () => ({
+					path: "core",
+					namespace: "mock",
+				}));
+				build.onLoad({ filter: /.*/, namespace: "mock" }, () => ({
+					contents:
+						"export class I18n { constructor(options) { this.t = options.resources[options.userLang] || options.resources.en } }",
+					loader: "js",
+				}));
+			},
+		},
+	],
 });
 const code = result.outputFiles[0].text;
 const { attachTableController } = await import(

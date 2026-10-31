@@ -20,11 +20,12 @@ const result = await build({
 					contents:
 						args.path === "typora"
 							? "export const editor = globalThis.hostEditor; export const File = globalThis.hostFile"
-							: `export class HtmlPostProcessor { static from(options) { return options } }
+							: `export class I18n { constructor(options) { this.t = options.resources[options.userLang] || options.resources.en } }
+        export class HtmlPostProcessor { static from(options) { return options } }
         export class HtmlExportProcessor { static from(options) { return options } }
         export class Plugin {
           commands = []; disposables = []; processors = []; exporters = [];
-          app = { features: { exporter: { register: processor => { this.exporters.push(processor); return () => {} } } } };
+          app = { i18n: { locale: globalThis.hostLocale || 'zh-CN' }, features: { exporter: { register: processor => { this.exporters.push(processor); return () => {} } } } };
           register(dispose) { this.disposables.push(dispose) }
           registerCommand(command) {
             this.commands.push(command)
@@ -151,6 +152,26 @@ function processAgain() {
 	});
 }
 try {
+	window.hostLocale = "en-US";
+	const englishTable = setup();
+	assert.equal(
+		document
+			.querySelector(".enhanced-table-controls > button")
+			.getAttribute("aria-label"),
+		"Table actions",
+	);
+	assert.equal(
+		document.querySelector('[data-operation="merge"]').textContent,
+		"Merge cells",
+	);
+	assert.equal(
+		plugin.commands.find((c) => c.id === "delete-row").title,
+		"Delete row",
+	);
+	mouse(englishTable.rows[0].cells[0]);
+	command("merge");
+	assert.match(alerts.at(-1), /select at least two cells/i);
+	window.hostLocale = "zh-CN";
 	let table = setup();
 	assert.equal(
 		plugin.commands.find((c) => c.id === "insert-row-below").hotkey,

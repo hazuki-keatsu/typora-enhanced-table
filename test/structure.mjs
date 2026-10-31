@@ -44,7 +44,7 @@ value = table(
 const before = value.outerHTML;
 assert.throws(
 	() => applyTableOperation(value, value.rows[1].cells[0], "insert-above"),
-	/合并单元格/,
+	/insertRowCrossesMerge/,
 );
 assert.equal(value.outerHTML, before, "rejected inserts are atomic");
 
@@ -53,7 +53,7 @@ value = table(
 );
 assert.throws(
 	() => applyTableOperation(value, value.rows[1].cells[1], "insert-left"),
-	/合并单元格/,
+	/insertColumnCrossesMerge/,
 );
 
 value = table(
@@ -84,7 +84,7 @@ assert.equal(value.querySelector("thead > tr")?.cells[0].tagName, "TH");
 assert.equal(selected.tagName, "TH");
 assert.throws(
 	() => applyTableOperation(value, value.rows[1].cells[0], "set-header"),
-	/第一行/,
+	/headerFirstRowOnly/,
 );
 
 value = table(
@@ -92,7 +92,7 @@ value = table(
 );
 assert.throws(
 	() => applyTableOperation(value, value.rows[0].cells[1], "set-header"),
-	/纵向合并/,
+	/headerVerticalMerge/,
 );
 assert.equal(value.tHead, null, "rejected header conversion is atomic");
 
