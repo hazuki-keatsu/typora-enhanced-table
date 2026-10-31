@@ -87,6 +87,79 @@ assert.equal(value.rows[0].cells[0].tagName, "TD");
 assert.equal(value.textContent, "ABCD");
 
 value = table(
+	"<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td>A</td><td>B</td></tr></tbody></table>",
+);
+applyTableOperation(value, value.rows[0].cells[0], "insert-above");
+assert.equal(
+	value.querySelectorAll(":scope > thead > tr").length,
+	1,
+	"inserting above the header keeps exactly one header row",
+);
+assert.ok(
+	[...value.rows[0].cells].every((cell) => cell.tagName === "TH"),
+	"the inserted first row becomes the header",
+);
+assert.equal(value.querySelector(":scope > tbody")?.textContent, "H1H2AB");
+
+value = table(
+	"<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td>A</td><td>B</td></tr></tbody></table>",
+);
+applyTableOperation(value, value.rows[0].cells[0], "insert-below");
+assert.equal(value.querySelectorAll(":scope > thead > tr").length, 1);
+assert.equal(value.querySelectorAll(":scope > tbody > tr").length, 2);
+assert.ok(
+	[...value.rows[1].cells].every((cell) => cell.tagName === "TD"),
+	"a row inserted below the header belongs to the body",
+);
+
+applyTableOperation(value, value.rows[1].cells[0], "insert-right");
+assert.ok(
+	[...value.rows[0].cells].every((cell) => cell.tagName === "TH"),
+	"a column inserted into a table with a header adds a header cell",
+);
+assert.ok([...value.rows[1].cells].every((cell) => cell.tagName === "TD"));
+
+value = table(
+	"<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>",
+);
+applyTableOperation(value, value.rows[0].cells[0], "delete-row");
+assert.equal(value.querySelectorAll(":scope > thead > tr").length, 1);
+assert.equal(value.rows[0].textContent, "AB");
+assert.ok(
+	[...value.rows[0].cells].every((cell) => cell.tagName === "TH"),
+	"deleting the header promotes the next row without clearing header state",
+);
+assert.equal(value.querySelector(":scope > tbody")?.textContent, "CD");
+
+value = table(
+	'<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td rowspan="2">A</td><td>B</td></tr><tr><td>C</td></tr></tbody></table>',
+);
+const headerBefore = value.outerHTML;
+assert.throws(
+	() => applyTableOperation(value, value.rows[0].cells[0], "delete-row"),
+	/headerVerticalMerge/,
+);
+assert.equal(
+	value.outerHTML,
+	headerBefore,
+	"a header cannot be deleted when the next row cannot become a header",
+);
+
+value = table(
+	'<table><thead><tr><th rowspan="2">H1</th><th>H2</th></tr><tr><th>H3</th></tr></thead><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>',
+);
+const mergedHeaderBefore = value.outerHTML;
+assert.throws(
+	() => applyTableOperation(value, value.rows[3].cells[0], "delete-row"),
+	/headerVerticalMerge/,
+);
+assert.equal(
+	value.outerHTML,
+	mergedHeaderBefore,
+	"an invalid existing header is rejected before an unrelated row changes",
+);
+
+value = table(
 	'<table><tbody><tr><td rowspan="2">A</td><td>B</td></tr><tr><td>C</td></tr></tbody></table>',
 );
 assert.throws(

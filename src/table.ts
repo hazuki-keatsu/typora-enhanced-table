@@ -154,6 +154,7 @@ function insertRow(
 	selected: CellRect,
 	width: number,
 	above: boolean,
+	headerEnabled: boolean,
 ) {
 	const boundary = above ? selected.top : selected.bottom + 1;
 	if (tableGrid(table).some((rect) => crossesRow(rect, boundary)))
@@ -166,6 +167,7 @@ function insertRow(
 		reference.sectionRowIndex + (above ? 0 : 1),
 	);
 	for (let column = 0; column < width; column++) row.insertCell();
+	if (headerEnabled) setHeader(table);
 	return row.cells[Math.min(selected.left, width - 1)];
 }
 
@@ -183,7 +185,9 @@ function insertColumn(
 		const next = rects.find(
 			(rect) => rect.top === top && rect.left >= boundary,
 		)?.cell;
-		const cell = document.createElement("td");
+		const cell = document.createElement(
+			row.parentElement === table.tHead ? "th" : "td",
+		);
 		row.insertBefore(cell, next ?? null);
 		if (top === selected.top) result = cell;
 	});
@@ -195,6 +199,7 @@ function deleteRows(
 	table: HTMLTableElement,
 	selected: CellRect,
 	rects: CellRect[],
+	headerEnabled: boolean,
 ) {
 	if (selected.top === 0 && selected.bottom === table.rows.length - 1)
 		throw Error("deleteAllRows");
@@ -205,8 +210,16 @@ function deleteRows(
 		)
 	)
 		throw Error("deleteRowCrossesMerge");
+	const nextRow = selected.bottom + 1;
+	if (
+		headerEnabled &&
+		selected.top === 0 &&
+		rects.some((rect) => rect.top === nextRow && rect.bottom > nextRow)
+	)
+		throw Error("headerVerticalMerge");
 	for (let row = selected.bottom; row >= selected.top; row--)
 		table.rows[row].remove();
+	if (headerEnabled) setHeader(table);
 	return cellAt(
 		table,
 		Math.min(selected.top, table.rows.length - 1),
@@ -253,6 +266,15 @@ function replaceCell(
 	return replacement;
 }
 
+function moveRowsToBody(table: HTMLTableElement, rows: HTMLTableRowElement[]) {
+	const body = table.tBodies[0] ?? table.createTBody();
+	const firstBodyRow = body.querySelector(":scope > tr");
+	for (const row of rows) {
+		for (const cell of Array.from(row.cells)) replaceCell(cell, "td");
+		body.insertBefore(row, firstBodyRow);
+	}
+}
+
 function setHeader(table: HTMLTableElement) {
 	const rects = tableGrid(table);
 	if (rects.some((rect) => rect.top === 0 && rect.bottom > 0))
@@ -270,6 +292,12 @@ function setHeader(table: HTMLTableElement) {
 		)
 			previousSection.remove();
 	}
+	const head = table.tHead;
+	if (!head) throw Error("invalidTable");
+	const bodyRows = Array.from(
+		head.querySelectorAll<HTMLTableRowElement>(":scope > tr"),
+	).filter((candidate) => candidate !== row);
+	if (bodyRows.length > 0) moveRowsToBody(table, bodyRows);
 	return cells[0];
 }
 
@@ -284,15 +312,10 @@ function removeHeader(table: HTMLTableElement) {
 		if (!firstCell) throw Error("invalidTable");
 		return firstCell;
 	}
-	const body = table.tBodies[0] ?? table.createTBody();
-	const firstBodyRow = body.querySelector(":scope > tr");
-	for (const row of rows) {
-		for (const cell of Array.from(row.cells)) replaceCell(cell, "td");
-		body.insertBefore(row, firstBodyRow);
-	}
+	moveRowsToBody(table, rows);
 	head.remove();
 	const firstCell =
-		body.querySelector<HTMLTableCellElement>(":scope > tr > td");
+		table.tBodies[0]?.querySelector<HTMLTableCellElement>(":scope > tr > td");
 	if (!firstCell) throw Error("invalidTable");
 	return firstCell;
 }
@@ -315,17 +338,20 @@ export function applyTableOperation(
 	operation: TableOperation,
 ): HTMLTableCellElement {
 	const { rects, selected, width } = structure(table, cell);
+	const headerEnabled = Boolean(table.tHead);
+	if (headerEnabled && rects.some((rect) => rect.top === 0 && rect.bottom > 0))
+		throw Error("headerVerticalMerge");
 	switch (operation) {
 		case "insert-above":
-			return insertRow(table, selected, width, true);
+			return insertRow(table, selected, width, true, headerEnabled);
 		case "insert-below":
-			return insertRow(table, selected, width, false);
+			return insertRow(table, selected, width, false, headerEnabled);
 		case "insert-left":
 			return insertColumn(table, selected, true);
 		case "insert-right":
 			return insertColumn(table, selected, false);
 		case "delete-row":
-			return deleteRows(table, selected, rects);
+			return deleteRows(table, selected, rects, headerEnabled);
 		case "delete-column":
 			return deleteColumns(table, selected, rects, width);
 	}
