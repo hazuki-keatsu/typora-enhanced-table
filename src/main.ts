@@ -44,9 +44,41 @@ type Session = {
 	anchor: HTMLTableCellElement | undefined;
 	composing: boolean;
 };
+type TableTarget = { paragraph: HTMLElement; cid: string };
 const marker = "data-enhanced-table";
 const selectedMarker = "data-enhanced-table-selected";
 const emptyTable = "<table><tbody><tr><td></td></tr></tbody></table>";
+const unsafeTableContent =
+	"table, script, style, iframe, object, embed, form, input, textarea, select, button, [contenteditable], [data-enhanced-table], [data-enhanced-table-selected]";
+
+function standaloneTable(html: string): string | undefined {
+	if (!html) return;
+	const parsed = new DOMParser().parseFromString(html, "text/html");
+	const table = parsed.body.firstElementChild;
+	if (
+		!(table instanceof HTMLTableElement) ||
+		parsed.body.children.length !== 1 ||
+		Array.from(parsed.body.childNodes).some(
+			(node) => node !== table && node.textContent?.trim(),
+		) ||
+		table.matches(
+			"[contenteditable], [data-enhanced-table], [data-enhanced-table-selected]",
+		) ||
+		table.querySelector(unsafeTableContent) ||
+		[table, ...table.querySelectorAll("*")].some((element) =>
+			Array.from(element.attributes).some((attribute) =>
+				attribute.name.toLowerCase().startsWith("on"),
+			),
+		)
+	)
+		return;
+	try {
+		tableGrid(table);
+	} catch {
+		return;
+	}
+	return table.outerHTML;
+}
 
 function clean(table: HTMLTableElement) {
 	const copy = table.cloneNode(true);
@@ -389,15 +421,16 @@ export default class EnhancedTable extends Plugin {
 			document,
 			"paste",
 			(event: ClipboardEvent) => {
-				if (!this.tableAt(event.target)) return;
-				event.preventDefault();
-				event.stopImmediatePropagation();
-				if (writable())
-					document.execCommand(
-						"insertText",
-						false,
-						event.clipboardData?.getData("text/plain") ?? "",
-					);
+				if (this.tableAt(event.target)) {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					if (writable())
+						document.execCommand(
+							"insertText",
+							false,
+							event.clipboardData?.getData("text/plain") ?? "",
+						);
+				} else this.createPastedTable(event);
 			},
 			true,
 		);
@@ -839,43 +872,40 @@ export default class EnhancedTable extends Plugin {
 		});
 	}
 
-	private createTable(event?: KeyboardEvent): boolean {
-		if (event) {
-			if (
-				event.key !== "Enter" ||
-				event.isComposing ||
-				event.shiftKey ||
-				event.ctrlKey ||
-				event.metaKey ||
-				event.altKey ||
-				!writable()
-			)
-				return false;
-		} else if (!writable() || this.session?.composing) return false;
+	private tableTarget(
+		expectedText: string,
+		atEnd: boolean,
+	): TableTarget | undefined {
 		const selection = document.getSelection();
-		if (selection?.rangeCount !== 1) return false;
-		const expectedText = event ? "<table>" : "";
+		if (selection?.rangeCount !== 1) return;
 		const range = selection.getRangeAt(0);
 		const paragraph = (
 			range.endContainer instanceof HTMLElement
 				? range.endContainer
 				: range.endContainer.parentElement
 		)?.closest<HTMLElement>('p[mdtype="paragraph"][cid]');
-		if (!paragraph || paragraph.parentElement !== editor.writingArea)
-			return false;
-		const contents = document.createRange();
-		contents.selectNodeContents(paragraph);
+		if (!paragraph || paragraph.parentElement !== editor.writingArea) return;
+		const suffix = range.cloneRange();
+		suffix.setEndAfter(paragraph);
 		if (
 			!range.collapsed ||
 			!paragraph.contains(range.endContainer) ||
-			(event &&
-				range.compareBoundaryPoints(Range.END_TO_END, contents) !== 0) ||
-			(event ? paragraph.textContent?.trim() : paragraph.textContent) !==
+			(atEnd && suffix.toString().trim()) ||
+			(expectedText ? paragraph.textContent?.trim() : paragraph.textContent) !==
 				expectedText
 		)
-			return false;
+			return;
 		const cid = paragraph.getAttribute("cid");
-		if (!cid) return false;
+		return cid ? { paragraph, cid } : undefined;
+	}
+
+	private replaceParagraphWithTable(
+		target: TableTarget,
+		expectedText: string,
+		tableHtml: string,
+		event?: Event,
+	): boolean {
+		const { paragraph, cid } = target;
 		const mutableEditor = editor as MutableEditor;
 		if (
 			typeof mutableEditor.store !== "function" ||
@@ -886,7 +916,8 @@ export default class EnhancedTable extends Plugin {
 		const node = editor.getNode(cid) as MutableEditorNode | undefined;
 		if (
 			!node ||
-			(event ? node.get("text")?.trim() : node.get("text")) !== expectedText ||
+			(expectedText ? node.get("text")?.trim() : node.get("text")) !==
+				expectedText ||
 			typeof node.parseFrom !== "function" ||
 			typeof node.readFromJson !== "function" ||
 			typeof node.toHTML !== "function"
@@ -900,7 +931,7 @@ export default class EnhancedTable extends Plugin {
 			const before = undo.UndoManager.buildReplaceUndo(node);
 			let createdTable: HTMLTableElement | undefined;
 			try {
-				node.set("text", emptyTable);
+				node.set("text", tableHtml);
 				const [html, nodes] = node.parseFrom({
 					skips: { old_code: false, pass_format: true },
 				});
@@ -924,6 +955,12 @@ export default class EnhancedTable extends Plugin {
 				if (cell && this.activate(table)) {
 					this.select(cell, false);
 					cell.focus();
+					const range = document.createRange();
+					range.selectNodeContents(cell);
+					range.collapse(true);
+					const selection = document.getSelection();
+					selection?.removeAllRanges();
+					selection?.addRange(range);
 				}
 			} catch (error) {
 				if (createdTable) this.disable(createdTable);
@@ -936,6 +973,50 @@ export default class EnhancedTable extends Plugin {
 			}
 		});
 		return true;
+	}
+
+	private createPastedTable(event: ClipboardEvent): boolean {
+		if (!writable() || this.session?.composing) return false;
+		const table =
+			standaloneTable(event.clipboardData?.getData("text/html") ?? "") ??
+			standaloneTable(event.clipboardData?.getData("text/plain") ?? "");
+		const target = this.tableTarget("", false);
+		if (
+			!target ||
+			!(event.target instanceof Node) ||
+			(event.target !== editor.writingArea &&
+				!target.paragraph.contains(event.target))
+		)
+			return false;
+		try {
+			undoAPI();
+		} catch {
+			return false;
+		}
+		return Boolean(
+			table && this.replaceParagraphWithTable(target, "", table, event),
+		);
+	}
+
+	private createTable(event?: KeyboardEvent): boolean {
+		if (event) {
+			if (
+				event.key !== "Enter" ||
+				event.isComposing ||
+				event.shiftKey ||
+				event.ctrlKey ||
+				event.metaKey ||
+				event.altKey ||
+				!writable()
+			)
+				return false;
+		} else if (!writable() || this.session?.composing) return false;
+		const expectedText = event ? "<table>" : "";
+		const target = this.tableTarget(expectedText, Boolean(event));
+		return Boolean(
+			target &&
+				this.replaceParagraphWithTable(target, expectedText, emptyTable, event),
+		);
 	}
 
 	private attempt(action: () => void) {

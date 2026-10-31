@@ -21,6 +21,12 @@
 
 当前插件声明的最低版本为 **Typora 1.5.0**、**插件核心 2.10.42**，目标平台为 Windows、Linux 和 macOS。*这不代表所有系统与版本组合都已完成验证，目前仅在 `macOS 27 - Typora 1.14.15 (7789)`，如有问题，请开启 Issue。*
 
+### 插件市场安装
+
+1. 打开 [Typora Community Plugin](https://github.com/typora-community-plugin/typora-community-plugin) 全局设置（默认快捷键 `ctrl+.`）。
+2. 在「插件市场」中找到 Enhanced Table，然后安装。
+3. 在「已安装插件」中启用 Enhanced Table，然后重启 Typora。
+
 ### 手动安装
 
 1. 从 [Releases](https://github.com/hazuki-keatsu/typora-enhanced-table/releases) 下载 `plugin.zip`。

@@ -664,8 +664,8 @@ try {
 	plugin.onload();
 	const paragraph = document.querySelector("p");
 	const createRange = document.createRange();
-	createRange.selectNodeContents(paragraph);
-	createRange.collapse(false);
+	createRange.setStart(paragraph.firstChild, "<table>".length);
+	createRange.collapse(true);
 	window.getSelection().removeAllRanges();
 	window.getSelection().addRange(createRange);
 	const create = new window.KeyboardEvent("keydown", {
@@ -683,6 +683,11 @@ try {
 	assert.equal(source, "<table><tbody><tr><td></td></tr></tbody></table>");
 	assert.equal(document.querySelectorAll("table td").length, 1);
 	assert.equal(document.querySelector("td").contentEditable, "true");
+	assert.equal(
+		window.getSelection().anchorNode,
+		document.querySelector("td"),
+		"creation places the caret in the new table cell",
+	);
 	assert.ok(document.querySelector("[data-enhanced-table-controls]"));
 	document.querySelector(".enhanced-table-controls > button").click();
 	document.querySelector('[data-operation="insert-right"]').click();
@@ -700,6 +705,125 @@ try {
 	);
 	assert.match(commands.at(-1).undo[0].json.content.text, /<table>/);
 	assert.equal(commands.at(-1).redo[0].json.content.text, "");
+	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const pastedParagraph = document.querySelector("p");
+	const pastedRange = document.createRange();
+	pastedRange.selectNodeContents(pastedParagraph);
+	pastedRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(pastedRange);
+	const clipboard = new window.DataTransfer();
+	clipboard.setData(
+		"text/html",
+		"<table><tbody><tr><td>Pasted</td></tr></tbody></table>",
+	);
+	const paste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: clipboard,
+	});
+	pastedParagraph.dispatchEvent(paste);
+	assert.equal(
+		paste.defaultPrevented,
+		true,
+		"standalone table paste is consumed",
+	);
+	assert.equal(
+		source,
+		"<table><tbody><tr><td>Pasted</td></tr></tbody></table>",
+	);
+	assert.equal(document.querySelector("td").contentEditable, "true");
+	assert.ok(document.querySelector("[data-enhanced-table-controls]"));
+	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div><input id="outside">';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const outsideParagraph = document.querySelector("p");
+	const outsideRange = document.createRange();
+	outsideRange.selectNodeContents(outsideParagraph);
+	outsideRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(outsideRange);
+	const outsidePaste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: clipboard,
+	});
+	document.querySelector("#outside").dispatchEvent(outsidePaste);
+	assert.equal(
+		outsidePaste.defaultPrevented,
+		false,
+		"table paste outside the writing area is not consumed",
+	);
+	assert.equal(source, "");
+	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const invalidParagraph = document.querySelector("p");
+	const invalidRange = document.createRange();
+	invalidRange.selectNodeContents(invalidParagraph);
+	invalidRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(invalidRange);
+	const invalidClipboard = new window.DataTransfer();
+	invalidClipboard.setData(
+		"text/html",
+		'<table><tbody><tr><td rowspan="2">Invalid</td></tr></tbody></table>',
+	);
+	const invalidPaste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: invalidClipboard,
+	});
+	invalidParagraph.dispatchEvent(invalidPaste);
+	assert.equal(
+		invalidPaste.defaultPrevented,
+		false,
+		"invalid table paste is not consumed",
+	);
+	assert.equal(source, "");
+	plugin.unload();
+	source = "Keep this text";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1">Keep this text</p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const textPasteParagraph = document.querySelector("p");
+	const textPasteRange = document.createRange();
+	textPasteRange.selectNodeContents(textPasteParagraph);
+	textPasteRange.collapse(false);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(textPasteRange);
+	const rejectedPaste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: clipboard,
+	});
+	textPasteParagraph.dispatchEvent(rejectedPaste);
+	assert.equal(
+		rejectedPaste.defaultPrevented,
+		false,
+		"table paste preserves nonempty paragraphs",
+	);
+	assert.equal(source, "Keep this text");
 	plugin.unload();
 	source = "<table>";
 	nodeType = "html_block";

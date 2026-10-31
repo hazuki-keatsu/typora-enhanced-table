@@ -16,10 +16,10 @@
 
 ## ub-mode action log
 
-| Action | Reason | Result |
-| --- | --- | --- |
-| Inspected command registration, table creation, tests, locales, and README | Find the smallest complete change and all callers | Existing `createTable` owns conversion and undo safely |
-| Added a red test for shortcut creation and text preservation | Pin user-visible behavior before implementation | It failed because the new command was not registered |
-| Reused the conversion transaction for a command path | Preserve Typora model, native undo, and rollback ownership | Command creates only from an empty focused paragraph |
-| Ran checks | Verify the changed artifact | Type check passed; the editor test is blocked by its pre-existing raw HTML creation assertion |
-| Reviewed the diff independently | Check for data-loss regressions | Rejected whitespace-only paragraphs and added a regression assertion |
+| Action                                                                     | Reason                                                     | Result                                                                                        |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Inspected command registration, table creation, tests, locales, and README | Find the smallest complete change and all callers          | Existing `createTable` owns conversion and undo safely                                        |
+| Added a red test for shortcut creation and text preservation               | Pin user-visible behavior before implementation            | It failed because the new command was not registered                                          |
+| Reused the conversion transaction for a command path                       | Preserve Typora model, native undo, and rollback ownership | Command creates only from an empty focused paragraph                                          |
+| Ran checks                                                                 | Verify the changed artifact                                | Type check passed; the editor test is blocked by its pre-existing raw HTML creation assertion |
+| Reviewed the diff independently                                            | Check for data-loss regressions                            | Rejected whitespace-only paragraphs and added a regression assertion                          |
