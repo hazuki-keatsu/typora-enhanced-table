@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 import { Window } from "happy-dom";
+
+const localeResources = {
+	en: JSON.parse(readFileSync("src/locales/lang.en.json", "utf8")),
+	"zh-cn": JSON.parse(readFileSync("src/locales/lang.zh-cn.json", "utf8")),
+};
 
 const result = await build({
 	entryPoints: ["src/main.ts"],
@@ -20,11 +26,14 @@ const result = await build({
 					contents:
 						args.path === "typora"
 							? "export const editor = globalThis.hostEditor; export const File = globalThis.hostFile"
-							: `export class I18n { constructor(options) { this.t = options.resources[options.userLang] || options.resources.en } }
+							: `const resources = ${JSON.stringify(localeResources)};
+        export const path = { join: (...parts) => parts.join('/') };
+        export class I18n { constructor(options) { const locale = options.userLang.toLowerCase(); this.t = resources[locale] || resources[locale.split('-')[0]] || resources[options.defaultLang] } }
         export class HtmlPostProcessor { static from(options) { return options } }
         export class HtmlExportProcessor { static from(options) { return options } }
         export class Plugin {
           commands = []; disposables = []; processors = []; exporters = [];
+          manifest = { dir: '/plugin' };
           app = { i18n: { locale: globalThis.hostLocale || 'zh-CN' }, features: { exporter: { register: processor => { this.exporters.push(processor); return () => {} } } } };
           register(dispose) { this.disposables.push(dispose) }
           registerCommand(command) {

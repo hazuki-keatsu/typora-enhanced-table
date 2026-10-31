@@ -1,16 +1,14 @@
 import { I18n } from "@typora-community-plugin/core";
-import en from "./locales/lang.en.json";
-import zh from "./locales/lang.zh-CN.json";
+import type * as en from "./locales/lang.en.json";
 
 export type MessageKey = keyof typeof en;
-let messages: Record<MessageKey, string> = zh;
+let messages: I18n<typeof en>["t"];
 
-export function setLocale(locale: string) {
-	const language = /^zh(?:[-_]|$)/i.test(locale) ? "zh-CN" : "en";
-	messages = new I18n({
-		resources: { en, "zh-CN": zh },
+export function setLocale(options: { localePath: string; userLang: string }) {
+	messages = new I18n<typeof en>({
+		localePath: options.localePath,
 		defaultLang: "en",
-		userLang: language,
+		userLang: options.userLang,
 	}).t;
 }
 

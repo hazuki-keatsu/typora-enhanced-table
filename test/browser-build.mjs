@@ -19,11 +19,14 @@ await build({
 					contents:
 						args.path === "typora"
 							? "export const editor = window.hostEditor; export const File = window.hostFile"
-							: `export const HtmlPostProcessor = {from: value => value};
+							: `export const path = {join: (...parts) => parts.join('/')};
+         export class I18n {constructor() {this.t = new Proxy({}, {get: (_, key) => key})}};
+         export const HtmlPostProcessor = {from: value => value};
          export const HtmlExportProcessor = {from: value => value};
          export class Plugin {
            commands = []; processors = []; disposables = [];
-           app = { features: { exporter: {register: processor => { window.exportProcessor = processor; return () => {} }} } };
+           manifest = {dir: '/plugin'};
+           app = { i18n: {locale: 'en'}, features: { exporter: {register: processor => { window.exportProcessor = processor; return () => {} }} } };
            registerCommand(command) {
              this.commands.push(command)
              this.registerDomEvent(globalThis.hostEditor.writingArea, 'keyup', event => {

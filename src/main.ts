@@ -91,7 +91,10 @@ export default class EnhancedTable extends Plugin {
 	private controllers = new Map<HTMLTableElement, () => void>();
 
 	onload() {
-		setLocale(this.app.i18n?.locale ?? navigator.language ?? "en");
+		setLocale({
+			localePath: Core.path.join(this.manifest.dir ?? "/src/", "locales"),
+			userLang: this.app.i18n.locale,
+		});
 		this.interceptNavigation();
 		this.registerCommand({
 			id: "merge",
