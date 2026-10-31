@@ -32,11 +32,26 @@ import {
 	LetterY,
 	LetterZ,
 	Option,
+	TextAlignCenter,
+	TextAlignEnd,
+	TextAlignStart,
 	createElement,
 } from "lucide";
 
 export function menuIcon(): SVGElement {
 	return createElement(LayoutGridCircles);
+}
+
+export function textAlignLeftIcon(): SVGElement {
+	return createElement(TextAlignStart);
+}
+
+export function textAlignCenterIcon(): SVGElement {
+	return createElement(TextAlignCenter);
+}
+
+export function textAlignRightIcon(): SVGElement {
+	return createElement(TextAlignEnd);
 }
 
 export function renderHotkey(element: Element, value: string): void {

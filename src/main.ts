@@ -1,7 +1,7 @@
 import "./style.scss";
 import * as Core from "@typora-community-plugin/core";
 import { editor, File } from "typora";
-import { attachTableController } from "./controller";
+import { attachTableController, type CellAlignment } from "./controller";
 import { setLocale, t, translateError } from "./locale";
 import {
 	applyTableOperation,
@@ -537,6 +537,11 @@ export default class EnhancedTable extends Plugin {
 		this.controllers.set(
 			table,
 			attachTableController(table, {
+				canAlign: () =>
+					this.session?.table === table &&
+					!this.session.composing &&
+					this.session.selected.length > 0,
+				align: (alignment) => this.changeAlignment(table, alignment),
 				hotkey: (operation) => {
 					const ids: Partial<Record<typeof operation, string>> = {
 						"insert-below": "insert-row-below",
@@ -779,6 +784,27 @@ export default class EnhancedTable extends Plugin {
 			this.prepare(table);
 			this.select(cell, false);
 			cell.focus();
+			this.commit();
+		});
+	}
+
+	private changeAlignment(table: HTMLTableElement, alignment: CellAlignment) {
+		this.attempt(() => {
+			const session = this.session;
+			if (
+				!session ||
+				session.table !== table ||
+				session.composing ||
+				session.selected.length === 0
+			)
+				throw Error("selectCellFirst");
+			if (
+				!writable() ||
+				editor.getNode(session.cid) !== session.node ||
+				session.node.get("text") !== session.lastCommitted
+			)
+				throw Error("documentChanged");
+			for (const cell of session.selected) cell.style.textAlign = alignment;
 			this.commit();
 		});
 	}

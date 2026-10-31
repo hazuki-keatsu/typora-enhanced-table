@@ -44,5 +44,8 @@
 	"selectCellFirst": "请先选中一个单元格。",
 	"tableConversionFailed": "无法将输入转换为单个 HTML 表格块。",
 	"tablePreviewMissing": "Typora 没有生成可编辑的表格预览。",
-	"tableEditUnavailable": "生成的表格无法进入编辑模式。"
+	"tableEditUnavailable": "生成的表格无法进入编辑模式。",
+	"alignLeft": "左对齐",
+	"alignCenter": "居中对齐",
+	"alignRight": "右对齐"
 }

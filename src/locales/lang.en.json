@@ -44,5 +44,8 @@
 	"selectCellFirst": "Select one cell first.",
 	"tableConversionFailed": "Cannot convert the input to a single HTML table block.",
 	"tablePreviewMissing": "Typora did not generate an editable table preview.",
-	"tableEditUnavailable": "The generated table cannot enter edit mode."
+	"tableEditUnavailable": "The generated table cannot enter edit mode.",
+	"alignLeft": "Align left",
+	"alignCenter": "Align center",
+	"alignRight": "Align right"
 }

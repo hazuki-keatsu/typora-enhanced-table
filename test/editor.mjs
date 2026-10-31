@@ -214,6 +214,22 @@ try {
 	);
 	source = original;
 	table = setup();
+	mouse(table.rows[0].cells[0]);
+	mouse(table.rows[1].cells[1], true);
+	document.querySelector('[data-alignment="center"]').click();
+	assert.ok(
+		[...document.querySelectorAll("[data-enhanced-table-selected]")].every(
+			(cell) => cell.style.textAlign === "center",
+		),
+		"alignment applies to every selected cell",
+	);
+	mouse(table.rows[0].cells[0]);
+	document.querySelector('[data-alignment="right"]').click();
+	assert.equal(table.rows[0].cells[0].style.textAlign, "right");
+	assert.equal(table.rows[1].cells[1].style.textAlign, "center");
+	assert.match(source, /text-align: (center|right)/);
+	source = original;
+	table = setup();
 	mouse(table.rows[1].cells[0]);
 	document.querySelector(".enhanced-table-controls > button").click();
 	assert.equal(

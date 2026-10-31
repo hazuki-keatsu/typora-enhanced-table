@@ -51,14 +51,20 @@ document.body.innerHTML = "<table><tbody><tr><td>A</td></tr></tbody></table>";
 const table = document.querySelector("table");
 let selected = false;
 const calls = [];
+const alignments = [];
 let binding = "Ctrl+Enter";
 const dispose = attachTableController(table, {
 	isAvailable: (operation) =>
 		operation === "set-header" || operation === "remove-header" || selected,
 	run: (operation) => calls.push(operation),
 	hotkey: (operation) => (operation === "insert-below" ? binding : undefined),
+	canAlign: () => selected,
+	align: (alignment) => alignments.push(alignment),
 });
 const trigger = document.querySelector(".enhanced-table-controls > button");
+assert.equal(document.querySelectorAll("[data-alignment]").length, 3);
+document.querySelector('[data-alignment="left"]').click();
+assert.deepEqual(alignments, []);
 trigger.click();
 assert.match(
 	document.querySelector('[data-operation="insert-below"]').textContent,
@@ -140,6 +146,8 @@ assert.match(
 document.querySelector('[data-operation="delete-row"]').click();
 assert.deepEqual(calls, ["delete-row"]);
 assert.equal(document.querySelector("[role=menu]").hidden, true);
+document.querySelector('[data-alignment="center"]').click();
+assert.deepEqual(alignments, ["center"]);
 
 trigger.click();
 document.body.dispatchEvent(

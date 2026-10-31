@@ -1,5 +1,11 @@
 import type { TableHeaderOperation, TableOperation } from "./table";
-import { menuIcon, renderHotkey } from "./icons";
+import {
+	menuIcon,
+	renderHotkey,
+	textAlignCenterIcon,
+	textAlignLeftIcon,
+	textAlignRightIcon,
+} from "./icons";
 import { t, type MessageKey } from "./locale";
 
 type MenuOperation =
@@ -9,6 +15,8 @@ type MenuOperation =
 	| "split"
 	| "copy-table"
 	| "delete-table";
+
+export type CellAlignment = "left" | "center" | "right";
 
 let controllerId = 0;
 
@@ -37,25 +45,49 @@ const operations: [MenuOperation, MessageKey][][] = [
 	],
 ];
 
+const alignOperations: [CellAlignment, MessageKey, () => SVGElement][] = [
+	["left", "alignLeft", textAlignLeftIcon],
+	["center", "alignCenter", textAlignCenterIcon],
+	["right", "alignRight", textAlignRightIcon],
+];
+
 export function attachTableController(
 	table: HTMLTableElement,
 	actions: {
 		isAvailable(operation: MenuOperation): boolean;
 		run(operation: MenuOperation): void;
 		hotkey(operation: MenuOperation): string | undefined;
+		canAlign(): boolean;
+		align(alignment: CellAlignment): void;
 	},
 ): () => void {
 	const doc = table.ownerDocument;
+
 	const controls = doc.createElement("div");
 	controls.className = "enhanced-table-controls";
 	controls.setAttribute("data-enhanced-table-controls", "");
 	controls.setAttribute("contenteditable", "false");
+
 	const trigger = doc.createElement("button");
 	trigger.type = "button";
 	trigger.append(menuIcon());
 	trigger.title = t("tableActions");
 	trigger.setAttribute("aria-label", t("tableActions"));
 	trigger.setAttribute("aria-expanded", "false");
+	const alignButtons = alignOperations.map(([alignment, label, icon]) => {
+		const button = doc.createElement("button");
+		button.type = "button";
+		button.title = t(label);
+		button.setAttribute("aria-label", t(label));
+		button.dataset.alignment = alignment;
+		button.append(icon());
+		button.onclick = () => {
+			if (!actions.canAlign()) return;
+			actions.align(alignment);
+		};
+		return button;
+	});
+
 	const popup = doc.createElement("div");
 	popup.id = `enhanced-table-controller-${++controllerId}`;
 	popup.className = "enhanced-table-controller-popup";
@@ -124,7 +156,7 @@ export function attachTableController(
 	};
 	doc.addEventListener("mousedown", dismiss, true);
 	doc.addEventListener("focusin", dismiss, true);
-	controls.append(trigger, popup);
+	controls.append(trigger, ...alignButtons, popup);
 	table.before(controls);
 	return () => {
 		doc.removeEventListener("mousedown", dismiss, true);
