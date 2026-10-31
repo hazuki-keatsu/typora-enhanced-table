@@ -86,6 +86,14 @@ window.hostEditor = {
 	getNode: () => node,
 	store: () => {},
 	nodeMap: {},
+	htmlBlock: { startEditing: () => ({ focus() {}, setCursor() {} }) },
+	selection: {
+		moveUpOrDown(target) {
+			const cm = window.hostEditor.htmlBlock.startEditing(target, "start");
+			cm.focus();
+			cm.setCursor({ line: 0, ch: 0 });
+		},
+	},
 	sourceView: { inSourceMode: false },
 	undo: {
 		UndoManager: {
@@ -140,6 +148,14 @@ function processAgain() {
 }
 try {
 	let table = setup();
+	window.hostEditor.selection.moveUpOrDown(
+		document.querySelector('[cid="n1"]'),
+	);
+	assert.equal(
+		document.activeElement,
+		table.rows[0].cells[0],
+		"native navigation enters first table cell",
+	);
 	assert.ok(
 		!document.querySelector(".enhanced-table-overlay, .enhanced-table-toolbar"),
 		"inline edit never opens overlay or toolbar",

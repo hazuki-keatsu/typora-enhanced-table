@@ -84,6 +84,7 @@ export default class EnhancedTable extends Plugin {
 	private controllers = new Map<HTMLTableElement, () => void>();
 
 	onload() {
+		this.interceptNavigation();
 		this.registerCommand({
 			id: "merge",
 			title: "合并单元格",
@@ -363,6 +364,77 @@ export default class EnhancedTable extends Plugin {
 			},
 			true,
 		);
+	}
+
+	private interceptNavigation() {
+		const host = editor as typeof editor & {
+			selection: { moveUpOrDown: (...args: unknown[]) => unknown };
+			htmlBlock: { startEditing: (...args: unknown[]) => unknown };
+		};
+		const selection = host.selection;
+		const html = host.htmlBlock;
+		if (
+			typeof selection?.moveUpOrDown !== "function" ||
+			typeof html?.startEditing !== "function"
+		)
+			return;
+		const original = selection.moveUpOrDown;
+		const plugin = this;
+		const wrapped = function (this: typeof selection, ...args: unknown[]) {
+			const start = html.startEditing;
+			html.startEditing = function (...parameters: unknown[]) {
+				const target = parameters[0];
+				const element =
+					target instanceof Element
+						? target
+						: target &&
+								typeof target === "object" &&
+								"0" in target &&
+								target[0] instanceof Element
+							? target[0]
+							: typeof target === "string"
+								? Array.from(
+										editor.writingArea?.querySelectorAll("[cid]") ?? [],
+									).find((el) => el.getAttribute("cid") === target)
+								: undefined;
+				const table = element?.querySelector<HTMLTableElement>(
+					".md-htmlblock-container > table[data-enhanced-table]",
+				);
+				const cell = table?.querySelector<HTMLTableCellElement>("td, th");
+				if (
+					!writable() ||
+					!table ||
+					!cell ||
+					!plugin.tables.has(table) ||
+					!plugin.activate(table)
+				)
+					return start.apply(this, parameters);
+				plugin.select(cell, false);
+				cell.focus();
+				const range = document.createRange();
+				range.selectNodeContents(cell);
+				range.collapse(true);
+				const current = document.getSelection();
+				current?.removeAllRanges();
+				current?.addRange(range);
+				return {
+					focus() {},
+					setCursor() {},
+					getCursor: () => ({ line: 0, ch: 0 }),
+					cursorCoords: () => ({ left: 0, right: 0 }),
+					coordsChar: () => ({ line: 0, ch: 0 }),
+				};
+			};
+			try {
+				return original.apply(this, args);
+			} finally {
+				html.startEditing = start;
+			}
+		};
+		selection.moveUpOrDown = wrapped;
+		this.register(() => {
+			if (selection.moveUpOrDown === wrapped) selection.moveUpOrDown = original;
+		});
 	}
 
 	onunload() {

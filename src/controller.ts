@@ -12,6 +12,27 @@ const operations: [TableOperation, string][] = [
 	["set-header", "将首行设为表头"],
 ];
 
+function menuIcon(): SVGSVGElement {
+	// From Lucide Icons - layout-grid-circles
+	const raw = `
+		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid-circles preview-icon">
+			<circle cx="17.5" cy="17.5" r="3.5"/>
+			<circle cx="17.5" cy="6.5" r="3.5"/>
+			<circle cx="6.5" cy="17.5" r="3.5"/>
+			<circle cx="6.5" cy="6.5" r="3.5"/>
+		</svg>
+	`;
+
+	const tpl = document.createElement('template');
+	tpl.innerHTML = raw.trim();
+	const svg = tpl.content.firstElementChild;
+
+	if (!(svg instanceof SVGSVGElement)) {
+		throw new Error('menuIcon: invalid SVG');
+	}
+	return svg;
+}
+
 export function attachTableController(
 	table: HTMLTableElement,
 	actions: {
@@ -26,7 +47,7 @@ export function attachTableController(
 	controls.setAttribute("contenteditable", "false");
 	const trigger = doc.createElement("button");
 	trigger.type = "button";
-	trigger.textContent = "⋮";
+	trigger.append(menuIcon());
 	trigger.title = "表格操作";
 	trigger.setAttribute("aria-label", "表格操作");
 	trigger.setAttribute("aria-expanded", "false");
@@ -36,10 +57,6 @@ export function attachTableController(
 	popup.setAttribute("role", "menu");
 	popup.hidden = true;
 	trigger.setAttribute("aria-controls", popup.id);
-	const hint = doc.createElement("p");
-	hint.textContent = "请先选中一个单元格";
-	hint.setAttribute("role", "status");
-	popup.append(hint);
 	const buttons = operations.map(([operation, text]) => {
 		const button = doc.createElement("button");
 		button.type = "button";
@@ -67,7 +84,6 @@ export function attachTableController(
 		buttons.forEach((button) => {
 			button.disabled = !selected;
 		});
-		hint.hidden = selected;
 		popup.hidden = false;
 		trigger.setAttribute("aria-expanded", "true");
 	};
