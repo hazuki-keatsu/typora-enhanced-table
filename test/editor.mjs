@@ -214,6 +214,21 @@ try {
 	);
 	source = original;
 	table = setup();
+	mouse(table.rows[1].cells[0]);
+	document.querySelector(".enhanced-table-controls > button").click();
+	assert.equal(
+		document.querySelector('[data-operation="set-header"]').disabled,
+		false,
+		"header operation does not require selecting the first row",
+	);
+	document.querySelector('[data-operation="set-header"]').click();
+	assert.equal(table.querySelectorAll(":scope > thead > tr").length, 1);
+	document.querySelector(".enhanced-table-controls > button").click();
+	document.querySelector('[data-operation="remove-header"]').click();
+	assert.equal(table.tHead, null);
+	assert.equal(table.rows[0].cells[0].tagName, "TD");
+	source = original;
+	table = setup();
 	commands.length = 0;
 	window.hostEditor.selection.moveUpOrDown(
 		document.querySelector('[cid="n1"]'),

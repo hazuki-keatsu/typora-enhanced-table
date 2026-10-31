@@ -5,10 +5,12 @@ import { attachTableController } from "./controller";
 import { setLocale, t, translateError } from "./locale";
 import {
 	applyTableOperation,
+	applyTableHeaderOperation,
 	mergeCells,
 	splitCell,
 	tableGrid,
 	type TableOperation,
+	type TableHeaderOperation,
 } from "./table";
 
 const { Plugin, HtmlPostProcessor, HtmlExportProcessor } = Core;
@@ -548,11 +550,15 @@ export default class EnhancedTable extends Plugin {
 						this.app.commands?.commandMap[`${this.manifest?.id}:${id}`]?.hotkey;
 					return key || undefined;
 				},
-				hasSelection: (operation) =>
-					this.session?.table === table &&
-					(operation === "merge"
+				isAvailable: (operation) => {
+					if (this.session?.table !== table || this.session.composing)
+						return false;
+					if (operation === "set-header") return !table.tHead;
+					if (operation === "remove-header") return Boolean(table.tHead);
+					return operation === "merge"
 						? this.session.selected.length >= 2
-						: this.session.selected.length === 1),
+						: this.session.selected.length === 1;
+				},
 				run: (operation) => {
 					if (operation === "merge" || operation === "split")
 						this.change(operation);
@@ -563,7 +569,12 @@ export default class EnhancedTable extends Plugin {
 							.catch((error: unknown) => {
 								showError(error);
 							});
-					} else this.changeStructure(table, operation);
+					} else if (
+						operation === "set-header" ||
+						operation === "remove-header"
+					)
+						this.changeHeader(table, operation);
+					else this.changeStructure(table, operation);
 				},
 			}),
 		);
@@ -765,6 +776,28 @@ export default class EnhancedTable extends Plugin {
 			)
 				throw Error("documentChanged");
 			const cell = applyTableOperation(table, session.selected[0], operation);
+			this.prepare(table);
+			this.select(cell, false);
+			cell.focus();
+			this.commit();
+		});
+	}
+
+	private changeHeader(
+		table: HTMLTableElement,
+		operation: TableHeaderOperation,
+	) {
+		this.attempt(() => {
+			const session = this.session;
+			if (!session || session.table !== table || session.composing)
+				throw Error("tableNotActive");
+			if (
+				!writable() ||
+				editor.getNode(session.cid) !== session.node ||
+				session.node.get("text") !== session.lastCommitted
+			)
+				throw Error("documentChanged");
+			const cell = applyTableHeaderOperation(table, operation);
 			this.prepare(table);
 			this.select(cell, false);
 			cell.focus();

@@ -12,8 +12,9 @@ export type TableOperation =
 	| "insert-left"
 	| "insert-right"
 	| "delete-row"
-	| "delete-column"
-	| "set-header";
+	| "delete-column";
+
+export type TableHeaderOperation = "set-header" | "remove-header";
 
 export function tableGrid(table: HTMLTableElement): CellRect[] {
 	const occupied: boolean[][] = [];
@@ -252,16 +253,12 @@ function replaceCell(
 	return replacement;
 }
 
-function setHeader(
-	table: HTMLTableElement,
-	selected: CellRect,
-	rects: CellRect[],
-) {
-	if (selected.top !== 0) throw Error("headerFirstRowOnly");
+function setHeader(table: HTMLTableElement) {
+	const rects = tableGrid(table);
 	if (rects.some((rect) => rect.top === 0 && rect.bottom > 0))
 		throw Error("headerVerticalMerge");
 	const row = table.rows[0];
-	const selectedIndex = Array.from(row.cells).indexOf(selected.cell);
+	if (!row) throw Error("invalidTable");
 	const cells = Array.from(row.cells).map((cell) => replaceCell(cell, "th"));
 	if (row.parentElement !== table.tHead) {
 		const previousSection = row.parentElement;
@@ -273,7 +270,43 @@ function setHeader(
 		)
 			previousSection.remove();
 	}
-	return cells[selectedIndex];
+	return cells[0];
+}
+
+function removeHeader(table: HTMLTableElement) {
+	const head = table.tHead;
+	const rows = Array.from(
+		head?.querySelectorAll<HTMLTableRowElement>(":scope > tr") ?? [],
+	);
+	if (!head || rows.length === 0) {
+		head?.remove();
+		const firstCell = table.querySelector<HTMLTableCellElement>("td, th");
+		if (!firstCell) throw Error("invalidTable");
+		return firstCell;
+	}
+	const body = table.tBodies[0] ?? table.createTBody();
+	const firstBodyRow = body.querySelector(":scope > tr");
+	for (const row of rows) {
+		for (const cell of Array.from(row.cells)) replaceCell(cell, "td");
+		body.insertBefore(row, firstBodyRow);
+	}
+	head.remove();
+	const firstCell =
+		body.querySelector<HTMLTableCellElement>(":scope > tr > td");
+	if (!firstCell) throw Error("invalidTable");
+	return firstCell;
+}
+
+export function applyTableHeaderOperation(
+	table: HTMLTableElement,
+	operation: TableHeaderOperation,
+): HTMLTableCellElement {
+	switch (operation) {
+		case "set-header":
+			return setHeader(table);
+		case "remove-header":
+			return removeHeader(table);
+	}
 }
 
 export function applyTableOperation(
@@ -295,7 +328,5 @@ export function applyTableOperation(
 			return deleteRows(table, selected, rects);
 		case "delete-column":
 			return deleteColumns(table, selected, rects, width);
-		case "set-header":
-			return setHeader(table, selected, rects);
 	}
 }

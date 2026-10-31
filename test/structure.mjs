@@ -10,9 +10,10 @@ const { code } = await transform(await fs.readFile("src/table.ts", "utf8"), {
 	loader: "ts",
 	format: "esm",
 });
-const { applyTableOperation, tableGrid } = await import(
-	`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
-);
+const { applyTableHeaderOperation, applyTableOperation, tableGrid } =
+	await import(
+		`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
+	);
 
 function table(html) {
 	window.document.body.innerHTML = html;
@@ -74,24 +75,22 @@ assert.equal(value.textContent, "BE");
 value = table(
 	"<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></tbody></table>",
 );
-const selected = applyTableOperation(
-	value,
-	value.rows[0].cells[0],
-	"set-header",
-);
+const selected = applyTableHeaderOperation(value, "set-header");
 assert.equal(value.querySelectorAll("thead > tr").length, 1);
 assert.equal(value.querySelector("thead > tr")?.cells[0].tagName, "TH");
 assert.equal(selected.tagName, "TH");
-assert.throws(
-	() => applyTableOperation(value, value.rows[1].cells[0], "set-header"),
-	/headerFirstRowOnly/,
-);
+applyTableHeaderOperation(value, "remove-header");
+applyTableHeaderOperation(value, "remove-header");
+assert.equal(value.tHead, null);
+assert.equal(value.rows[0].parentElement?.tagName, "TBODY");
+assert.equal(value.rows[0].cells[0].tagName, "TD");
+assert.equal(value.textContent, "ABCD");
 
 value = table(
 	'<table><tbody><tr><td rowspan="2">A</td><td>B</td></tr><tr><td>C</td></tr></tbody></table>',
 );
 assert.throws(
-	() => applyTableOperation(value, value.rows[0].cells[1], "set-header"),
+	() => applyTableHeaderOperation(value, "set-header"),
 	/headerVerticalMerge/,
 );
 assert.equal(value.tHead, null, "rejected header conversion is atomic");

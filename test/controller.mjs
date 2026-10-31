@@ -16,7 +16,13 @@ globalThis.Node = window.Node;
 globalThis.document = document;
 globalThis.SVGSVGElement = window.SVGSVGElement;
 const result = await build({
-	entryPoints: ["src/controller.ts"],
+	stdin: {
+		contents:
+			'import { setLocale } from "./src/locale"; setLocale({ localePath: "src/locales", userLang: "en" }); export { attachTableController } from "./src/controller";',
+		resolveDir: process.cwd(),
+		sourcefile: "controller-test.ts",
+		loader: "ts",
+	},
 	bundle: true,
 	write: false,
 	format: "esm",
@@ -30,7 +36,7 @@ const result = await build({
 				}));
 				build.onLoad({ filter: /.*/, namespace: "mock" }, () => ({
 					contents:
-						"export class I18n { constructor(options) { this.t = options.resources[options.userLang] || options.resources.en } }",
+						"export class I18n { constructor() { this.t = new Proxy({}, { get: (_, key) => key }) } }",
 					loader: "js",
 				}));
 			},
@@ -47,7 +53,8 @@ let selected = false;
 const calls = [];
 let binding = "Ctrl+Enter";
 const dispose = attachTableController(table, {
-	hasSelection: () => selected,
+	isAvailable: (operation) =>
+		operation === "set-header" || operation === "remove-header" || selected,
 	run: (operation) => calls.push(operation),
 	hotkey: (operation) => (operation === "insert-below" ? binding : undefined),
 });
@@ -99,11 +106,22 @@ assert.equal(
 	).length,
 	0,
 );
-assert.equal(document.querySelectorAll("[data-operation]").length, 11);
+assert.equal(document.querySelectorAll("[data-operation]").length, 12);
 assert.ok(
-	[...document.querySelectorAll("[data-operation]")].every(
-		(button) => button.disabled,
-	),
+	[...document.querySelectorAll("[data-operation]")]
+		.filter(
+			(button) =>
+				!["set-header", "remove-header"].includes(button.dataset.operation),
+		)
+		.every((button) => button.disabled),
+);
+assert.equal(
+	document.querySelector('[data-operation="set-header"]').disabled,
+	false,
+);
+assert.equal(
+	document.querySelector('[data-operation="remove-header"]').disabled,
+	false,
 );
 assert.equal(
 	document.querySelectorAll('[role="menu"] > [role="group"]').length,

@@ -1,9 +1,10 @@
-import type { TableOperation } from "./table";
+import type { TableHeaderOperation, TableOperation } from "./table";
 import { menuIcon, renderHotkey } from "./icons";
 import { t, type MessageKey } from "./locale";
 
 type MenuOperation =
 	| TableOperation
+	| TableHeaderOperation
 	| "merge"
 	| "split"
 	| "copy-table"
@@ -28,6 +29,7 @@ const operations: [MenuOperation, MessageKey][][] = [
 		["merge", "mergeCells"],
 		["split", "splitCell"],
 		["set-header", "setHeader"],
+		["remove-header", "removeHeader"],
 	],
 	[
 		["copy-table", "copyTable"],
@@ -38,7 +40,7 @@ const operations: [MenuOperation, MessageKey][][] = [
 export function attachTableController(
 	table: HTMLTableElement,
 	actions: {
-		hasSelection(operation: MenuOperation): boolean;
+		isAvailable(operation: MenuOperation): boolean;
 		run(operation: MenuOperation): void;
 		hotkey(operation: MenuOperation): string | undefined;
 	},
@@ -75,7 +77,7 @@ export function attachTableController(
 			button.dataset.operation = operation;
 			button.setAttribute("role", "menuitem");
 			button.onclick = () => {
-				if (!actions.hasSelection(operation)) return;
+				if (!actions.isAvailable(operation)) return;
 				actions.run(operation);
 				close();
 			};
@@ -94,7 +96,7 @@ export function attachTableController(
 		}
 		buttons.forEach((button) => {
 			const operation = button.dataset.operation as MenuOperation;
-			button.disabled = !actions.hasSelection(operation);
+			button.disabled = !actions.isAvailable(operation);
 			const hint = button.querySelector(".enhanced-table-hotkey");
 			if (hint) renderHotkey(hint, actions.hotkey(operation) ?? "");
 		});
