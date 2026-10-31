@@ -633,6 +633,7 @@ export default class EnhancedTable extends Plugin {
 				const after = undo.UndoManager.buildReplaceUndo(node);
 				undo.register({ undo: [before], redo: [after] });
 				this.disable(table);
+				document.getSelection()?.removeAllRanges();
 				this.session = undefined;
 				block.outerHTML = html;
 			} catch (error) {

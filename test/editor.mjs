@@ -600,7 +600,7 @@ try {
 	plugin.onload();
 	assert.equal(
 		plugin.commands.find((c) => c.id === "create-table").hotkey,
-		"ctrl+alt+t",
+		"ctrl+shift+t",
 	);
 	const emptyParagraph = document.querySelector("p");
 	const shortcutRange = document.createRange();
@@ -612,7 +612,7 @@ try {
 		new window.KeyboardEvent("keyup", {
 			key: "t",
 			ctrlKey: true,
-			altKey: true,
+			shiftKey: true,
 			bubbles: true,
 		}),
 	);
@@ -693,6 +693,11 @@ try {
 	assert.equal(nodeType, "paragraph");
 	assert.equal(source, "");
 	assert.ok(document.querySelector('p[mdtype="paragraph"]'));
+	assert.equal(
+		window.getSelection().rangeCount,
+		0,
+		"deleting a table clears the browser selection",
+	);
 	assert.match(commands.at(-1).undo[0].json.content.text, /<table>/);
 	assert.equal(commands.at(-1).redo[0].json.content.text, "");
 	plugin.unload();
