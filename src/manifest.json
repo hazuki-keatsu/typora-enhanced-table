@@ -1,7 +1,7 @@
 {
 	"id": "hazuki-keatsu.enhanced-table",
 	"name": "Enhanced Table",
-	"description": "Visual HTML table editing with merged cells.",
+	"description": "Visual HTML table editing with merged cells and more.",
 	"author": "hazuki-keatsu",
 	"authorUrl": "https://github.com/hazuki-keatsu",
 	"repo": "hazuki-keatsu/typora-enhanced-table",
