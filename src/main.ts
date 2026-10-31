@@ -839,18 +839,19 @@ export default class EnhancedTable extends Plugin {
 			event.ctrlKey ||
 			event.metaKey ||
 			event.altKey ||
-			!writable() ||
-			!(event.target instanceof HTMLElement)
+			!writable()
 		)
-			return false;
-		const paragraph = event.target.closest<HTMLElement>(
-			'p[mdtype="paragraph"][cid]',
-		);
-		if (!paragraph || paragraph.parentElement !== editor.writingArea)
 			return false;
 		const selection = document.getSelection();
 		if (selection?.rangeCount !== 1) return false;
 		const range = selection.getRangeAt(0);
+		const paragraph = (
+			range.endContainer instanceof HTMLElement
+				? range.endContainer
+				: range.endContainer.parentElement
+		)?.closest<HTMLElement>('p[mdtype="paragraph"][cid]');
+		if (!paragraph || paragraph.parentElement !== editor.writingArea)
+			return false;
 		const contents = document.createRange();
 		contents.selectNodeContents(paragraph);
 		if (

@@ -609,7 +609,7 @@ try {
 		bubbles: true,
 		cancelable: true,
 	});
-	paragraph.dispatchEvent(create);
+	window.hostEditor.writingArea.dispatchEvent(create);
 	assert.equal(
 		create.defaultPrevented,
 		true,
@@ -633,6 +633,28 @@ try {
 	assert.equal(commands.at(-1).redo[0].json.content.text, "");
 	plugin.unload();
 	source = "<table>";
+	nodeType = "html_block";
+	document.body.innerHTML =
+		'<div id="write"><div class="md-htmlblock" mdtype="html_block" cid="n1"><textarea></textarea></div></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	window.getSelection().removeAllRanges();
+	const rawCreate = new window.KeyboardEvent("keydown", {
+		key: "Enter",
+		bubbles: true,
+		cancelable: true,
+	});
+	document.querySelector("textarea").dispatchEvent(rawCreate);
+	assert.equal(
+		rawCreate.defaultPrevented,
+		true,
+		"Enter converts an exact raw HTML <table> block",
+	);
+	assert.equal(source, "<table><tbody><tr><td></td></tr></tbody></table>");
+	assert.equal(document.querySelectorAll("table td").length, 1);
+	plugin.unload();
+	source = "<table>";
 	nodeType = "paragraph";
 	failRegister = true;
 	document.body.innerHTML =
@@ -646,7 +668,7 @@ try {
 	failedRange.collapse(false);
 	window.getSelection().removeAllRanges();
 	window.getSelection().addRange(failedRange);
-	failedParagraph.dispatchEvent(
+	window.hostEditor.writingArea.dispatchEvent(
 		new window.KeyboardEvent("keydown", {
 			key: "Enter",
 			bubbles: true,

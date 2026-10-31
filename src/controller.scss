@@ -38,7 +38,7 @@ $btnSize: 14px;
 	}
 }
 
-.md-htmlblock-container:has(> table[data-enhanced-table]:focus-within)>.enhanced-table-controls,
+.md-htmlblock-container:focus-within > .enhanced-table-controls,
 .enhanced-table-controls:focus-within {
 	visibility: visible;
 }
