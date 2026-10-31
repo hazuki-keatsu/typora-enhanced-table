@@ -1,43 +1,45 @@
 import type { TableOperation } from "./table";
+import { menuIcon, renderHotkey } from "./icons";
+
+type MenuOperation =
+	| TableOperation
+	| "merge"
+	| "split"
+	| "copy-table"
+	| "delete-table";
 
 let controllerId = 0;
 
-const operations: [TableOperation, string][] = [
-	["insert-above", "上方插入行"],
-	["insert-below", "下方插入行"],
-	["insert-left", "左侧插入列"],
-	["insert-right", "右侧插入列"],
-	["delete-row", "删除所在行"],
-	["delete-column", "删除所在列"],
-	["set-header", "将首行设为表头"],
+const operations: [MenuOperation, string][][] = [
+	[
+		["insert-above", "上方插入行"],
+		["insert-below", "下方插入行"],
+	],
+	[
+		["insert-left", "左侧插入列"],
+		["insert-right", "右侧插入列"],
+	],
+	[
+		["delete-row", "删除所在行"],
+		["delete-column", "删除所在列"],
+	],
+	[
+		["merge", "合并单元格"],
+		["split", "拆分单元格"],
+		["set-header", "将首行设为表头"],
+	],
+	[
+		["copy-table", "复制表格"],
+		["delete-table", "删除表格"],
+	],
 ];
-
-function menuIcon(): SVGSVGElement {
-	// From Lucide Icons - layout-grid-circles
-	const raw = `
-		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid-circles preview-icon">
-			<circle cx="17.5" cy="17.5" r="3.5"/>
-			<circle cx="17.5" cy="6.5" r="3.5"/>
-			<circle cx="6.5" cy="17.5" r="3.5"/>
-			<circle cx="6.5" cy="6.5" r="3.5"/>
-		</svg>
-	`;
-
-	const tpl = document.createElement('template');
-	tpl.innerHTML = raw.trim();
-	const svg = tpl.content.firstElementChild;
-
-	if (!(svg instanceof SVGSVGElement)) {
-		throw new Error('menuIcon: invalid SVG');
-	}
-	return svg;
-}
 
 export function attachTableController(
 	table: HTMLTableElement,
 	actions: {
-		hasSelection(): boolean;
-		run(operation: TableOperation): void;
+		hasSelection(operation: MenuOperation): boolean;
+		run(operation: MenuOperation): void;
+		hotkey(operation: MenuOperation): string | undefined;
 	},
 ): () => void {
 	const doc = table.ownerDocument;
@@ -57,19 +59,28 @@ export function attachTableController(
 	popup.setAttribute("role", "menu");
 	popup.hidden = true;
 	trigger.setAttribute("aria-controls", popup.id);
-	const buttons = operations.map(([operation, text]) => {
-		const button = doc.createElement("button");
-		button.type = "button";
-		button.textContent = text;
-		button.dataset.operation = operation;
-		button.setAttribute("role", "menuitem");
-		button.onclick = () => {
-			if (!actions.hasSelection()) return;
-			actions.run(operation);
-			close();
-		};
-		popup.append(button);
-		return button;
+	const buttons = operations.flatMap((items) => {
+		const group = doc.createElement("div");
+		group.className = "enhanced-table-controller-group";
+		group.setAttribute("role", "group");
+		popup.append(group);
+		return items.map(([operation, text]) => {
+			const button = doc.createElement("button");
+			button.type = "button";
+			button.textContent = text;
+			const hint = doc.createElement("span");
+			hint.className = "enhanced-table-hotkey";
+			button.append(hint);
+			button.dataset.operation = operation;
+			button.setAttribute("role", "menuitem");
+			button.onclick = () => {
+				if (!actions.hasSelection(operation)) return;
+				actions.run(operation);
+				close();
+			};
+			group.append(button);
+			return button;
+		});
 	});
 	const close = () => {
 		popup.hidden = true;
@@ -80,9 +91,11 @@ export function attachTableController(
 			close();
 			return;
 		}
-		const selected = actions.hasSelection();
 		buttons.forEach((button) => {
-			button.disabled = !selected;
+			const operation = button.dataset.operation as MenuOperation;
+			button.disabled = !actions.hasSelection(operation);
+			const hint = button.querySelector(".enhanced-table-hotkey");
+			if (hint) renderHotkey(hint, actions.hotkey(operation) ?? "");
 		});
 		popup.hidden = false;
 		trigger.setAttribute("aria-expanded", "true");

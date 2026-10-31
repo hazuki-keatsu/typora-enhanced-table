@@ -38,6 +38,7 @@ await esbuild.build({
 });
 
 await fs.copyFile("src/manifest.json", "dist/manifest.json");
+await fs.copyFile("node_modules/lucide/LICENSE", "dist/LICENSE-lucide.txt");
 await fs.rename("dist/main.css", "dist/style.css");
 if (IS_DEV) await fs.rename("dist/main.css.map", "dist/style.css.map");
 

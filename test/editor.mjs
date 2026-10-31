@@ -66,6 +66,10 @@ const node = {
 		source = text;
 	},
 	parseFrom: () => {
+		if (source === "") {
+			nodeType = "paragraph";
+			return ['<p mdtype="paragraph" cid="n1"></p>', [node]];
+		}
 		nodeType = "html_block";
 		return [
 			`<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${source}</div></div>`,
@@ -148,6 +152,39 @@ function processAgain() {
 }
 try {
 	let table = setup();
+	assert.equal(
+		plugin.commands.find((c) => c.id === "insert-row-below").hotkey,
+		"ctrl+enter",
+	);
+	assert.equal(
+		plugin.commands.find((c) => c.id === "delete-row").hotkey,
+		"ctrl+shift+backspace",
+	);
+	mouse(table.rows[0].cells[0]);
+	table.rows[0].cells[0].dispatchEvent(
+		new window.KeyboardEvent("keyup", {
+			key: "Enter",
+			ctrlKey: true,
+			bubbles: true,
+		}),
+	);
+	assert.equal(table.rows.length, 3, "registered shortcut inserts a row");
+	table.rows[1].cells[0].dispatchEvent(
+		new window.KeyboardEvent("keyup", {
+			key: "Backspace",
+			ctrlKey: true,
+			shiftKey: true,
+			bubbles: true,
+		}),
+	);
+	assert.equal(
+		table.rows.length,
+		2,
+		"registered shortcut deletes selected row",
+	);
+	source = original;
+	table = setup();
+	commands.length = 0;
 	window.hostEditor.selection.moveUpOrDown(
 		document.querySelector('[cid="n1"]'),
 	);
@@ -526,6 +563,13 @@ try {
 	document.querySelector('[data-operation="insert-right"]').click();
 	assert.equal(document.querySelectorAll("table td").length, 2);
 	assert.match(source, /<td><\/td><td><\/td>/);
+	document.querySelector(".enhanced-table-controls > button").click();
+	document.querySelector('[data-operation="delete-table"]').click();
+	assert.equal(nodeType, "paragraph");
+	assert.equal(source, "");
+	assert.ok(document.querySelector('p[mdtype="paragraph"]'));
+	assert.match(commands.at(-1).undo[0].json.content.text, /<table>/);
+	assert.equal(commands.at(-1).redo[0].json.content.text, "");
 	plugin.unload();
 	source = "<table>";
 	nodeType = "paragraph";

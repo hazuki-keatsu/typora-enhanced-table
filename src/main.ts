@@ -99,6 +99,26 @@ export default class EnhancedTable extends Plugin {
 			hotkey: "ctrl+shift+u",
 			callback: () => this.change("split"),
 		});
+		this.registerCommand({
+			id: "insert-row-below",
+			title: "下方插入行",
+			scope: "editor",
+			hotkey: "ctrl+enter",
+			callback: () => {
+				if (this.session)
+					this.changeStructure(this.session.table, "insert-below");
+			},
+		});
+		this.registerCommand({
+			id: "delete-row",
+			title: "删除行",
+			scope: "editor",
+			hotkey: "ctrl+shift+backspace",
+			callback: () => {
+				if (this.session)
+					this.changeStructure(this.session.table, "delete-row");
+			},
+		});
 		this.registerMarkdownPostProcessor(
 			HtmlPostProcessor.from({
 				selector: ".md-htmlblock-container > table",
@@ -269,6 +289,14 @@ export default class EnhancedTable extends Plugin {
 					return;
 				}
 				const key = event.key.toLowerCase();
+				const primary = event.ctrlKey && !event.metaKey;
+				if (
+					primary &&
+					!event.altKey &&
+					((key === "enter" && !event.shiftKey) ||
+						(key === "backspace" && event.shiftKey))
+				)
+					event.preventDefault();
 				if ((event.ctrlKey || event.metaKey) && !event.altKey) {
 					if (key === "s") {
 						if (this.session?.composing) {
@@ -496,13 +524,88 @@ export default class EnhancedTable extends Plugin {
 		this.controllers.set(
 			table,
 			attachTableController(table, {
-				hasSelection: () =>
-					this.session?.table === table && this.session.selected.length === 1,
-				run: (operation) => this.changeStructure(table, operation),
+				hotkey: (operation) => {
+					const ids: Partial<Record<typeof operation, string>> = {
+						"insert-below": "insert-row-below",
+						"delete-row": "delete-row",
+						merge: "merge",
+						split: "split",
+					};
+					const id = ids[operation];
+					const key =
+						id &&
+						this.app.commands?.commandMap[`${this.manifest?.id}:${id}`]?.hotkey;
+					return key || undefined;
+				},
+				hasSelection: (operation) =>
+					this.session?.table === table &&
+					(operation === "merge"
+						? this.session.selected.length >= 2
+						: this.session.selected.length === 1),
+				run: (operation) => {
+					if (operation === "merge" || operation === "split")
+						this.change(operation);
+					else if (operation === "delete-table") this.deleteTable(table);
+					else if (operation === "copy-table") {
+						void navigator.clipboard
+							.writeText(clean(table))
+							.catch((error: unknown) => {
+								window.alert(String(error));
+							});
+					} else this.changeStructure(table, operation);
+				},
 			}),
 		);
 		for (const previous of this.tables)
 			if (!previous.isConnected) this.disable(previous);
+	}
+
+	private deleteTable(table: HTMLTableElement) {
+		this.attempt(() => {
+			const session = this.session;
+			if (
+				!session ||
+				session.table !== table ||
+				session.composing ||
+				!writable() ||
+				editor.getNode(session.cid) !== session.node ||
+				session.node.get("text") !== session.lastCommitted
+			)
+				throw Error("文档已改变或被锁定。");
+			const node = session.node as MutableEditorNode;
+			const host = editor as MutableEditor;
+			if (
+				typeof node.parseFrom !== "function" ||
+				typeof node.readFromJson !== "function" ||
+				typeof node.toHTML !== "function"
+			)
+				throw Error("当前 Typora 不支持删除表格。");
+			const block = table.closest<HTMLElement>(".md-htmlblock");
+			if (!block) throw Error("无法找到表格所在文档块。");
+			const undo = undoAPI();
+			undo.endSnap?.(true);
+			const before = undo.UndoManager.buildReplaceUndo(node);
+			try {
+				node.set("text", "");
+				const [html, nodes] = node.parseFrom({
+					skips: { old_code: false, pass_format: true },
+				});
+				if (
+					nodes.length !== 1 ||
+					nodes[0] !== node ||
+					node.get("type") !== "paragraph"
+				)
+					throw Error("无法将表格转换为空段落。");
+				const after = undo.UndoManager.buildReplaceUndo(node);
+				undo.register({ undo: [before], redo: [after] });
+				this.disable(table);
+				this.session = undefined;
+				block.outerHTML = html;
+			} catch (error) {
+				node.readFromJson(before.json, host.nodeMap);
+				throw error;
+			}
+		});
 	}
 
 	private disable(table: HTMLTableElement) {

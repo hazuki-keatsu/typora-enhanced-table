@@ -37,6 +37,7 @@
 		"esbuild-plugin-typora": "npm:@typora-community-plugin/esbuild-plugin-typora@^1.0.12",
 		"esbuild-sass-plugin": "^2.12.0",
 		"happy-dom": "^21.0.4",
+		"lucide": "^1.64.0",
 		"rollup": "^4.1.4",
 		"rollup-plugin-scss": "^4.0.0",
 		"rollup-plugin-typora": "npm:@typora-community-plugin/rollup-plugin-typora@^1.1.0",
