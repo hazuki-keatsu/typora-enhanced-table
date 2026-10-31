@@ -591,6 +591,70 @@ try {
 		"customized binding runs through the core registry",
 	);
 	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	assert.equal(
+		plugin.commands.find((c) => c.id === "create-table").hotkey,
+		"ctrl+alt+t",
+	);
+	const emptyParagraph = document.querySelector("p");
+	const shortcutRange = document.createRange();
+	shortcutRange.selectNodeContents(emptyParagraph);
+	shortcutRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(shortcutRange);
+	emptyParagraph.dispatchEvent(
+		new window.KeyboardEvent("keyup", {
+			key: "t",
+			ctrlKey: true,
+			altKey: true,
+			bubbles: true,
+		}),
+	);
+	assert.equal(source, "<table><tbody><tr><td></td></tr></tbody></table>");
+	assert.equal(document.querySelector("td").contentEditable, "true");
+	assert.match(commands.at(-1).undo[0].json.content.text, /^$/);
+	plugin.unload();
+	source = "Keep this text";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1">Keep this text</p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const textParagraph = document.querySelector("p");
+	const refusalRange = document.createRange();
+	refusalRange.selectNodeContents(textParagraph);
+	refusalRange.collapse(false);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(refusalRange);
+	command("create-table");
+	assert.equal(
+		source,
+		"Keep this text",
+		"shortcut preserves nonempty paragraphs",
+	);
+	plugin.unload();
+	source = " ";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"> </p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const whitespaceParagraph = document.querySelector("p");
+	const whitespaceRange = document.createRange();
+	whitespaceRange.selectNodeContents(whitespaceParagraph);
+	whitespaceRange.collapse(false);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(whitespaceRange);
+	command("create-table");
+	assert.equal(source, " ", "shortcut preserves whitespace paragraphs");
+	plugin.unload();
 	source = "<table>";
 	nodeType = "paragraph";
 	document.body.innerHTML =

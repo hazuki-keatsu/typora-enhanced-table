@@ -6,6 +6,7 @@
 	"deleteSelectedRows": "Delete row",
 	"deleteSelectedColumns": "Delete column",
 	"deleteRow": "Delete row",
+	"createTable": "Create HTML table",
 	"mergeCells": "Merge cells",
 	"splitCell": "Split cell",
 	"setHeader": "Set first row as header",

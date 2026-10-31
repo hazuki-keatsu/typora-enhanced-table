@@ -99,6 +99,13 @@ export default class EnhancedTable extends Plugin {
 		});
 		this.interceptNavigation();
 		this.registerCommand({
+			id: "create-table",
+			title: t("createTable"),
+			scope: "editor",
+			hotkey: "ctrl+shift+t",
+			callback: () => this.createTable(),
+		});
+		this.registerCommand({
 			id: "merge",
 			title: t("mergeCells"),
 			scope: "editor",
@@ -831,19 +838,22 @@ export default class EnhancedTable extends Plugin {
 		});
 	}
 
-	private createTable(event: KeyboardEvent): boolean {
-		if (
-			event.key !== "Enter" ||
-			event.isComposing ||
-			event.shiftKey ||
-			event.ctrlKey ||
-			event.metaKey ||
-			event.altKey ||
-			!writable()
-		)
-			return false;
+	private createTable(event?: KeyboardEvent): boolean {
+		if (event) {
+			if (
+				event.key !== "Enter" ||
+				event.isComposing ||
+				event.shiftKey ||
+				event.ctrlKey ||
+				event.metaKey ||
+				event.altKey ||
+				!writable()
+			)
+				return false;
+		} else if (!writable() || this.session?.composing) return false;
 		const selection = document.getSelection();
 		if (selection?.rangeCount !== 1) return false;
+		const expectedText = event ? "<table>" : "";
 		const range = selection.getRangeAt(0);
 		const paragraph = (
 			range.endContainer instanceof HTMLElement
@@ -857,8 +867,10 @@ export default class EnhancedTable extends Plugin {
 		if (
 			!range.collapsed ||
 			!paragraph.contains(range.endContainer) ||
-			range.compareBoundaryPoints(Range.END_TO_END, contents) !== 0 ||
-			paragraph.textContent?.trim() !== "<table>"
+			(event &&
+				range.compareBoundaryPoints(Range.END_TO_END, contents) !== 0) ||
+			(event ? paragraph.textContent?.trim() : paragraph.textContent) !==
+				expectedText
 		)
 			return false;
 		const cid = paragraph.getAttribute("cid");
@@ -872,14 +884,15 @@ export default class EnhancedTable extends Plugin {
 		mutableEditor.store(cid);
 		const node = editor.getNode(cid) as MutableEditorNode | undefined;
 		if (
-			node?.get("text")?.trim() !== "<table>" ||
+			!node ||
+			(event ? node.get("text")?.trim() : node.get("text")) !== expectedText ||
 			typeof node.parseFrom !== "function" ||
 			typeof node.readFromJson !== "function" ||
 			typeof node.toHTML !== "function"
 		)
 			return false;
-		event.preventDefault();
-		event.stopImmediatePropagation();
+		event?.preventDefault();
+		event?.stopImmediatePropagation();
 		this.attempt(() => {
 			const undo = undoAPI();
 			undo.endSnap?.(true);

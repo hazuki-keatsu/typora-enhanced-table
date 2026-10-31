@@ -58,6 +58,7 @@ pnpm run pack
 
 | 操作 | 快捷键 |
 | --- | --- |
+| 创建 HTML 表格（空段落） | `Ctrl + Alt + T` |
 | 合并单元格 | `Ctrl + Shift + M` |
 | 拆分单元格 | `Ctrl + Shift + U` |
 | 在下方插入行 | `Ctrl + Enter` |
