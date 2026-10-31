@@ -150,6 +150,12 @@ export function attachTableController(
 		close();
 		trigger.focus();
 	});
+	// Close popup when the outside was clicked.
+	document.addEventListener('pointerdown', (e) => {
+		if (e.target instanceof Node && !popup.contains(e.target)) {
+			popup.hidden = true;
+		}
+	});
 	const dismiss = (event: Event) => {
 		if (event.target instanceof Node && !controls.contains(event.target))
 			close();
