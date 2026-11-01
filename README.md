@@ -19,7 +19,7 @@
 
 先安装 [Typora Community Plugin](https://github.com/typora-community-plugin/typora-community-plugin)，再安装本插件。
 
-当前插件声明的最低版本为 **Typora 1.5.0**、**插件核心 2.10.42**，目标平台为 Windows、Linux 和 macOS。*这不代表所有系统与版本组合都已完成验证，目前仅在 `macOS 27 - Typora 1.14.15 (7789)`，如有问题，请开启 Issue。*
+当前插件声明的最低版本为 **Typora 1.5.0**、**插件核心 2.10.42**，目标平台为 Windows、Linux 和 macOS。_这不代表所有系统与版本组合都已完成验证，目前仅在 `macOS 27 - Typora 1.14.15 (7789)`，如有问题，请开启 Issue。_
 
 ### 插件市场安装
 
@@ -62,13 +62,13 @@ pnpm run pack
 
 启用插件后，直接点击单元格即可编辑文字。点击一个单元格，再按住 `Shift` 点击另一个单元格，可以选择矩形区域。
 
-| 操作 | 快捷键 |
-| --- | --- |
-| 创建 HTML 表格（空段落） | `Ctrl + Alt + T` |
-| 合并单元格 | `Ctrl + Shift + M` |
-| 拆分单元格 | `Ctrl + Shift + U` |
-| 在下方插入行 | `Ctrl + Enter` |
-| 删除行 | `Ctrl + Shift + Backspace` |
+| 操作                     | 快捷键                     |
+| ------------------------ | -------------------------- |
+| 创建 HTML 表格（空段落） | `Ctrl + Alt + T`           |
+| 合并单元格               | `Ctrl + Shift + M`         |
+| 拆分单元格               | `Ctrl + Shift + U`         |
+| 在下方插入行             | `Ctrl + Enter`             |
+| 删除行                   | `Ctrl + Shift + Backspace` |
 
 点击表格左上角的控制器，可以查看并使用更多操作，包括插入或删除行列、复制表格、删除表格、设置表头和调整对齐方式。
 

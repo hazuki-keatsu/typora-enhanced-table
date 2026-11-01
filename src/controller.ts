@@ -151,7 +151,7 @@ export function attachTableController(
 		trigger.focus();
 	});
 	// Close popup when the outside was clicked.
-	document.addEventListener('pointerdown', (e) => {
+	document.addEventListener("pointerdown", (e) => {
 		if (e.target instanceof Node && !popup.contains(e.target)) {
 			popup.hidden = true;
 		}
