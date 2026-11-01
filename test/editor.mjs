@@ -70,6 +70,31 @@ let nodeType = "html_block";
 const commands = [];
 const alerts = [];
 let failRegister = false;
+// Typora renders HTML blocks through DOMPurify: these attributes never reach the DOM.
+function renderHtmlBlock(html) {
+	const container = document.createElement("div");
+	container.innerHTML = html;
+	container.querySelectorAll("style, head").forEach((element) => {
+		element.remove();
+	});
+	container.querySelectorAll("*").forEach((element) => {
+		for (const attribute of Array.from(element.attributes)) {
+			const name = attribute.name.toLowerCase();
+			if (
+				name === "class" ||
+				name === "id" ||
+				name === "cid" ||
+				name === "contenteditable" ||
+				name.startsWith("data-")
+			)
+				element.removeAttribute(attribute.name);
+		}
+	});
+	return container.innerHTML;
+}
+function renderBlock() {
+	return `<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${renderHtmlBlock(source)}</div></div>`;
+}
 const node = {
 	get: (key) => (key === "type" ? nodeType : source),
 	set: (_key, text) => {
@@ -81,10 +106,7 @@ const node = {
 			return ['<p mdtype="paragraph" cid="n1"></p>', [node]];
 		}
 		nodeType = "html_block";
-		return [
-			`<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${source}</div></div>`,
-			[node],
-		];
+		return [renderBlock(), [node]];
 	},
 	readFromJson: (json) => {
 		source = json.content.text;
@@ -93,7 +115,7 @@ const node = {
 	toHTML: () =>
 		nodeType === "paragraph"
 			? '<p mdtype="paragraph" cid="n1">&lt;table&gt;</p>'
-			: `<div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${source}</div></div>`,
+			: renderBlock(),
 };
 window.hostFile = { isLocked: false };
 window.hostEditor = {
@@ -128,7 +150,7 @@ window.eval(result.outputFiles[0].text);
 let plugin;
 function setup(preview = source) {
 	if (plugin) plugin.unload();
-	document.body.innerHTML = `<div id="write"><div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${preview}</div></div></div>`;
+	document.body.innerHTML = `<div id="write"><div class="md-htmlblock" cid="n1"><div class="md-htmlblock-container">${renderHtmlBlock(preview)}</div></div></div>`;
 	window.hostEditor.writingArea = document.querySelector("#write");
 	plugin = new window.TablePlugin.default();
 	plugin.onload();
@@ -741,6 +763,88 @@ try {
 	);
 	assert.equal(document.querySelector("td").contentEditable, "true");
 	assert.ok(document.querySelector("[data-enhanced-table-controls]"));
+	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const markdownParagraph = document.querySelector("p");
+	const markdownRange = document.createRange();
+	markdownRange.selectNodeContents(markdownParagraph);
+	markdownRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(markdownRange);
+	const markdownClipboard = new window.DataTransfer();
+	markdownClipboard.setData(
+		"text/html",
+		'<!DOCTYPE html><table class="md-table"><thead><tr><th>A</th></tr></thead><tbody><tr><td>B</td></tr></tbody></table>',
+	);
+	markdownClipboard.setData("text/plain", "| A |\n| --- |\n| B |");
+	const markdownAlerts = alerts.length;
+	const markdownPaste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: markdownClipboard,
+	});
+	markdownParagraph.dispatchEvent(markdownPaste);
+	assert.equal(
+		markdownPaste.defaultPrevented,
+		false,
+		"Typora's own copied Markdown table stays with the native paste",
+	);
+	assert.equal(source, "");
+	assert.equal(alerts.length, markdownAlerts);
+	plugin.unload();
+	source = "";
+	nodeType = "paragraph";
+	document.body.innerHTML =
+		'<div id="write"><p mdtype="paragraph" cid="n1"></p></div>';
+	window.hostEditor.writingArea = document.querySelector("#write");
+	plugin = new window.TablePlugin.default();
+	plugin.onload();
+	const normalizedParagraph = document.querySelector("p");
+	const normalizedRange = document.createRange();
+	normalizedRange.selectNodeContents(normalizedParagraph);
+	normalizedRange.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(normalizedRange);
+	const normalizedClipboard = new window.DataTransfer();
+	normalizedClipboard.setData(
+		"text/html",
+		'<table class="grid" id="pasted"><tbody><tr><td class="cell">Pasted</td></tr></tbody></table>',
+	);
+	const normalizedAlerts = alerts.length;
+	const normalizedPaste = new window.ClipboardEvent("paste", {
+		bubbles: true,
+		cancelable: true,
+		clipboardData: normalizedClipboard,
+	});
+	normalizedParagraph.dispatchEvent(normalizedPaste);
+	assert.equal(
+		normalizedPaste.defaultPrevented,
+		true,
+		"external table paste is still consumed",
+	);
+	assert.equal(
+		source,
+		"<table><tbody><tr><td>Pasted</td></tr></tbody></table>",
+		"pasted table source is normalized to the host render",
+	);
+	assert.equal(
+		commands.at(-1).undo[0].json.content.text,
+		"",
+		"normalized paste keeps the empty paragraph as its undo baseline",
+	);
+	assert.equal(
+		commands.at(-1).redo[0].json.content.text,
+		"<table><tbody><tr><td>Pasted</td></tr></tbody></table>",
+	);
+	assert.equal(document.querySelector("td").contentEditable, "true");
+	assert.ok(document.querySelector("[data-enhanced-table-controls]"));
+	assert.equal(alerts.length, normalizedAlerts);
 	plugin.unload();
 	source = "";
 	nodeType = "paragraph";

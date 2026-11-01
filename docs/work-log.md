@@ -59,3 +59,11 @@
 - 普通顶层段落精确输入 `<table>` 并按 Enter 时，通过 Typora 节点解析生成单个 body 单元格表格；创建、结构操作和文字编辑共用原生 replace undo 快照。注册快照失败时恢复原段落节点与 DOM。
 - TDD 先观察缺少结构 API 的失败，再实现插入、删除、表头转换；独立覆盖控制器选择门禁、关闭和销毁，宿主边界覆盖创建、结构写回和失败回滚。
 - Safari 验收通过真实按钮插入列、删除选中逻辑列、继续文字编辑、合并/拆分、原生重绘和卸载；`<table>` 段落转换仍由 Typora 宿主边界模拟测试覆盖。
+
+## 粘贴 Typora 复制的表格
+
+- 复现：Test 替身原先原样回显 `parseFrom`，没有模拟 Typora 渲染 HTML 块时的 DOMPurify；补上 class/id/cid/data-*/contenteditable 与 style/head 的清洗后，加入两条粘贴断言并观察失败。
+- 原因：Typora「复制表格」的 `text/html` 是渲染后的 Markdown 表格（`table.md-table` + 内联样式），插件接管后 `enable()` 的「源码 outerHTML 全等」不成立，抛 `tableEditUnavailable` 并回滚。
+- 决策一：入口不接管 Typora 自带复制；`markdownTableCopy()` 识别 `md-table` 后返回 false，交还原生粘贴，Markdown 表格保持 Markdown。
+- 决策二：外部 HTML 表格以宿主渲染结果为准；首次 `enable()` 失败时用 `clean(rendered)` 再渲染一次，使源码与 DOM 按构造成立，而不是放宽 `enable()` 的全等校验。
+- 验证：`tsc --noEmit`、表格/结构/控制器/国际化套件通过；编辑套件在新增断言后仍停在既有 raw-HTML Enter 断言（HEAD 同位置同样失败，aa6dca3 引入、c5ccc42 改为段落锚点后未同步），跳过该 22 行后其余断言全部通过。未做 Typora 实机复验。

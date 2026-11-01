@@ -80,6 +80,17 @@ function standaloneTable(html: string): string | undefined {
 	return table.outerHTML;
 }
 
+// Typora's "Copy Table" puts the rendered Markdown table (with this class) on the
+// clipboard next to its markdown source; that paste must stay with Typora.
+function markdownTableCopy(html: string): boolean {
+	if (!html) return false;
+	const table = new DOMParser().parseFromString(html, "text/html").body
+		.firstElementChild;
+	return (
+		table instanceof HTMLTableElement && table.classList.contains("md-table")
+	);
+}
+
 function clean(table: HTMLTableElement) {
 	const copy = table.cloneNode(true);
 	if (!(copy instanceof HTMLTableElement)) throw Error("cannotReadTable");
@@ -905,7 +916,7 @@ export default class EnhancedTable extends Plugin {
 		tableHtml: string,
 		event?: Event,
 	): boolean {
-		const { paragraph, cid } = target;
+		const { cid } = target;
 		const mutableEditor = editor as MutableEditor;
 		if (
 			typeof mutableEditor.store !== "function" ||
@@ -931,23 +942,17 @@ export default class EnhancedTable extends Plugin {
 			const before = undo.UndoManager.buildReplaceUndo(node);
 			let createdTable: HTMLTableElement | undefined;
 			try {
-				node.set("text", tableHtml);
-				const [html, nodes] = node.parseFrom({
-					skips: { old_code: false, pass_format: true },
-				});
-				if (nodes.length !== 1 || nodes[0] !== node)
-					throw Error("tableConversionFailed");
-				paragraph.outerHTML = html;
-				const block = Array.from(editor.writingArea?.children ?? []).find(
-					(element) => element.getAttribute("cid") === cid,
-				);
-				const table = block?.querySelector(
-					":scope > .md-htmlblock-container > table",
-				);
-				if (!(table instanceof HTMLTableElement))
-					throw Error("tablePreviewMissing");
+				let table = this.renderTableSource(node, cid, tableHtml);
 				createdTable = table;
 				this.enable(table);
+				if (!table.hasAttribute(marker)) {
+					// Typora sanitizes HTML blocks before rendering, so markup the host
+					// strips can never match its own source. Adopt the render as the
+					// source; re-rendering it is then identical by construction.
+					table = this.renderTableSource(node, cid, clean(table));
+					createdTable = table;
+					this.enable(table);
+				}
 				if (!table.hasAttribute(marker)) throw Error("tableEditUnavailable");
 				const after = undo.UndoManager.buildReplaceUndo(node);
 				undo.register({ undo: [before], redo: [after] });
@@ -975,10 +980,38 @@ export default class EnhancedTable extends Plugin {
 		return true;
 	}
 
+	private renderTableSource(
+		node: MutableEditorNode,
+		cid: string,
+		source: string,
+	): HTMLTableElement {
+		node.set("text", source);
+		const [html, nodes] = node.parseFrom({
+			skips: { old_code: false, pass_format: true },
+		});
+		if (nodes.length !== 1 || nodes[0] !== node)
+			throw Error("tableConversionFailed");
+		const target = Array.from(editor.writingArea?.children ?? []).find(
+			(element) => element.getAttribute("cid") === cid,
+		);
+		if (target) target.outerHTML = html;
+		const block = Array.from(editor.writingArea?.children ?? []).find(
+			(element) => element.getAttribute("cid") === cid,
+		);
+		const table = block?.querySelector(
+			":scope > .md-htmlblock-container > table",
+		);
+		if (!(table instanceof HTMLTableElement))
+			throw Error("tablePreviewMissing");
+		return table;
+	}
+
 	private createPastedTable(event: ClipboardEvent): boolean {
 		if (!writable() || this.session?.composing) return false;
+		const html = event.clipboardData?.getData("text/html") ?? "";
+		if (markdownTableCopy(html)) return false;
 		const table =
-			standaloneTable(event.clipboardData?.getData("text/html") ?? "") ??
+			standaloneTable(html) ??
 			standaloneTable(event.clipboardData?.getData("text/plain") ?? "");
 		const target = this.tableTarget("", false);
 		if (
